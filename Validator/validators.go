@@ -1,0 +1,184 @@
+package Validator
+
+import (
+	"fmt"
+	"reflect"
+	"regexp"
+	"strings"
+	"time"
+)
+
+func IsZero(v reflect.Value) bool {
+
+	if kind := v.Kind(); kind == reflect.Struct {
+		size := v.NumField()
+		for i := 0; i < size; i++ {
+			if IsZero(v.Field(i)) == false {
+				return false
+			}
+		}
+		return true
+	} else if kind == reflect.Array {
+		size := v.Len()
+		for i := 0; i < size; i++ {
+			if IsZero(v.Index(i)) == false {
+				return false
+			}
+		}
+		return true
+	} else if kind == reflect.Bool {
+		return v.Bool() == false
+	} else if kind == reflect.String {
+		return v.String() == ""
+	} else if kind == reflect.Uint || kind == reflect.Uint8 || kind == reflect.Uint16 || kind == reflect.Uint32 || kind == reflect.Uint64 {
+		return v.Uint() == 0
+	} else if kind == reflect.Int || kind == reflect.Int8 || kind == reflect.Int16 || kind == reflect.Int32 || kind == reflect.Int64 {
+		return v.Int() == 0
+	} else if kind == reflect.Float32 || kind == reflect.Float64 {
+		return v.Float() == 0
+	} else if kind == reflect.Slice {
+		return v.Len() == 0
+	} else if kind == reflect.Invalid {
+		return true
+	}
+
+	return v.IsNil()
+}
+
+func BeforeNow(msg string) Tester {
+	return func(c *Context) {
+		timeNow := time.Now()
+		if c.Value.Interface().(time.Time).After(timeNow) {
+			c.Err(msg)
+		}
+	}
+}
+
+func AfterNow(msg string) Tester {
+	return func(c *Context) {
+		timeNow := time.Now()
+		if c.Value.Interface().(time.Time).Before(timeNow) {
+			c.Err(msg)
+		}
+	}
+}
+
+func NoEmpty(msg string) Tester {
+	return func(c *Context) {
+		if IsZero(c.Value) {
+			c.Err(msg)
+		}
+	}
+}
+
+func Empty(msg string) Tester {
+	return func(c *Context) {
+		if IsZero(c.Value) == false {
+			c.Err(msg)
+		}
+	}
+}
+
+func OneOf(msg string, list ...interface{}) Tester {
+	return func(c *Context) {
+		for i := 0; i < len(list); i++ {
+			if reflect.DeepEqual(list[i], c.Value.Interface()) {
+				return
+			}
+		}
+		c.Err(msg)
+		return
+	}
+}
+
+func StringContains(msg string, item string) Tester {
+	return func(c *Context) {
+		if strings.Contains(c.Value.String(), item) == false {
+			c.Err(msg)
+		}
+	}
+}
+
+func SliceContains(msg string, item interface{}) Tester {
+	return func(c *Context) {
+		size := c.Value.Len()
+		for i := 0; i < size; i++ {
+			if reflect.DeepEqual(c.Value.Index(i).Interface(), item) {
+				return
+			}
+		}
+		c.Err(msg)
+		return
+	}
+}
+
+func SameAs(msg string, FieldName string) Tester {
+	return func(c *Context) {
+		if reflect.DeepEqual(c.Field(FieldName).Interface(), c.Value.Interface()) == false {
+			c.Err(msg)
+		}
+	}
+}
+
+func MinLength(msg string, length int) Tester {
+	return func(c *Context) {
+		if c.Value.Len() < length {
+			c.Err(msg)
+		}
+	}
+}
+
+func MaxLength(msg string, length int) Tester {
+	return func(c *Context) {
+		if c.Value.Len() > length {
+			c.Err(msg)
+		}
+	}
+}
+
+func MinUint(msg string, i uint64) Tester {
+	return func(c *Context) {
+		if c.Value.Uint() < i {
+			c.Err(msg)
+		}
+	}
+}
+
+func MaxUint(msg string, i uint64) Tester {
+	return func(c *Context) {
+		if c.Value.Uint() > i {
+			c.Err(msg)
+		}
+	}
+}
+
+func MinInt(msg string, i int64) Tester {
+	return func(c *Context) {
+		if c.Value.Int() < i {
+			c.Err(msg)
+		}
+	}
+}
+
+func MaxInt(msg string, i int64) Tester {
+	return func(c *Context) {
+		if c.Value.Int() > i {
+			c.Err(msg)
+		}
+	}
+}
+
+var Email = NewRegexValidator("^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\\])$")
+
+func NewRegexValidator(pattern string) func(msg string) func(*Context) {
+	regExp := regexp.MustCompile(pattern)
+	return func(msg string) func(*Context) {
+		return func(c *Context) {
+			str := fmt.Sprint(c.Value.Interface())
+			if !regExp.MatchString(str) {
+				c.Err(msg)
+			}
+			return
+		}
+	}
+}
