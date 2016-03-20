@@ -11,7 +11,7 @@ type Mapper struct {
 	name string
 	typ  reflect.Type
 	pool *sync.Pool
-	app  *AppContext
+	app  *Application
 }
 
 type controllerHandler struct {
@@ -23,6 +23,8 @@ type controllerHandler struct {
 func (c *controllerHandler) Handle(rcxt *Request.Context) {
 	ii := c.pool.Get()
 	defer c.pool.Put(ii)
+	rcxt.Context.Inject(ii)
+
 	var arguments = [1]reflect.Value{reflect.ValueOf(ii)}
 	if c.isPtr == false {
 		arguments[0] = arguments[0].Elem()

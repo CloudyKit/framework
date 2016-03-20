@@ -1,50 +1,80 @@
-package Di_test
+package Di
 
 import (
-	"github.com/CloudyKit/framework/Di"
 	"testing"
 )
 
-var context = Di.New()
+type testHolder struct {
+	*testing.T
+}
 
-func TestDi(t *testing.T) {
+func TestDiProvideAndInject(t *testing.T) {
 
-	newContext := context.Child()
+	// creates a new DI context
+	var newContext = New()
 	defer newContext.Done()
 
-	var tt struct {
-		*testing.T
-	}
+	var tt testHolder
 
+	// Provide t *testing.T into newContext
 	newContext.Put(t)
+	// Injects t *testing.T into testHolder struct{ *testing.T }
 	newContext.Inject(&tt)
+	// check value was injected successfully
+	if tt.T != t {
+		t.Fatal("Fail to inject value from the current context")
+	}
 
-	if tt.T == nil {
+	// creates a child context
+	newChildContext := newContext.Child()
+	defer newChildContext.Done()
+
+	// reset tt value
+	tt = testHolder{}
+
+	// Injects t *testing.T into testHolder struct{ *testing.T } again now using child context
+	newChildContext.Inject(&tt)
+	// check value was injected successfully
+	if tt.T != t {
+		t.Fatal("Fail to inject value from the child context")
+	}
+
+	var empty = New()
+	defer empty.Done()
+	tt = testHolder{}
+	if tt.T != nil {
 		t.Fail()
-	} else {
-		tt.Log("Injector is working")
 	}
 }
 
-func TestDiFromParent(t *testing.T) {
-	context.Put(t)
-	newContext := context.Child()
-	defer newContext.Done()
-	var tt struct {
-		*testing.T
+func TestDiDone(t *testing.T) {
+	var context = New()
+	if context.references != 0 {
+		t.Fatal("Inválid reference counting ", context.references)
 	}
-	newContext.Inject(&tt)
-	if tt.T == nil {
-		newContext.Put(t)
-		newContext.Inject(&tt)
-		if tt.T != nil {
-			t.Log("Found in current scope")
-		}
-		t.Fail()
-	} else {
-		tt.Log("Injector is working")
+	var childContext = context.Child()
+	if context.references != 1 {
+		t.Fatal("Inválid reference counting ", context.references)
+	}
+	if childContext.references != 0 {
+		t.Fatal("Inválid reference counting ", childContext.references)
+	}
+
+	childContext.Done()
+	if childContext.parent != nil {
+		t.Fatal("Inválid reference counting ", childContext.references)
+	}
+	if context.references != 0 {
+		t.Fatal("Inválid reference counting ", context.references)
+	}
+
+	context.Done()
+	if context.parent != nil {
+		t.Fatal("Inválid reference counting ", context.references)
 	}
 }
+
+var context = New()
 
 func BenchmarkInject(b *testing.B) {
 	var tt struct {

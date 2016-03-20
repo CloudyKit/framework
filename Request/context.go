@@ -12,11 +12,11 @@ import (
 type Context struct {
 	Di.Context
 
-	R  *http.Request
+	Rq *http.Request
 	Rw http.ResponseWriter
 
-	Ps   Router.Values
-	Name string
+	Ps Router.Values
+	Id string
 }
 
 var _New = sync.Pool{
@@ -32,7 +32,7 @@ func New(c Context) (cc *Context) {
 }
 
 func (cc *Context) ReceiveJson(target interface{}) error {
-	return json.NewDecoder(cc.R.Body).Decode(target)
+	return json.NewDecoder(cc.Rq.Body).Decode(target)
 }
 
 func (cc *Context) SendJson(from interface{}) error {
@@ -40,9 +40,11 @@ func (cc *Context) SendJson(from interface{}) error {
 }
 
 func (cc *Context) Done() {
-	cc.R = nil
+	defer _New.Put(cc)
+	cc.Rq = nil
 	cc.Rw = nil
 	cc.Ps.Values = nil
+	cc.Context.Done()
 	cc.Context = Di.Context{}
 }
 

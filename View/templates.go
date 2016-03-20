@@ -11,12 +11,26 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"text/template/parse"
 )
 
 var DefaultManager = &Manager{}
 
 var DefaultStdTemplateLoader = NewStdTemplateLoader("./views")
+
+func init() {
+	Di.Walkable(Context{})
+	App.Default.Put(DefaultManager)
+
+	App.Default.Set((Table)(nil), func(c Di.Context) interface{} {
+		tt := tablePool.Get()
+		c.Put(tt)
+		return tt
+	})
+
+	DefaultManager.AddLoader(DefaultStdTemplateLoader, ".go.html", ".html.go")
+}
 
 func NewStdTemplateLoader(base string) *StdTemplateLoader {
 	stdLoader := new(StdTemplateLoader)
@@ -26,9 +40,22 @@ func NewStdTemplateLoader(base string) *StdTemplateLoader {
 	return stdLoader
 }
 
+type Table map[string]interface{}
+
+var tablePool = sync.Pool{
+	New: func() interface{} {
+		return make(Table)
+	},
+}
+
+func (t Table) Done() {
+	tablePool.Put(t)
+}
+
 type Context struct {
-	Manager    *Manager
-	Controller *Request.Context
+	Manager *Manager
+	Context *Request.Context
+	Data    Table
 }
 
 type RendererList struct {
@@ -57,13 +84,7 @@ func (r Context) Renderer(v Renderer) error {
 }
 
 func (r Context) Render(view string, context interface{}) error {
-	return r.Manager.Render(r.Controller.Rw, view, context)
-}
-
-func init() {
-	Di.Walkable(Context{})
-	App.Default.Put(DefaultManager)
-	DefaultManager.AddLoader(DefaultStdTemplateLoader, ".go.html", ".html.go")
+	return r.Manager.Render(r.Context.Rw, view, context)
 }
 
 type StdTemplateLoader struct {

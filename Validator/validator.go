@@ -39,7 +39,6 @@ func (cc *Context) Field(name string) reflect.Value {
 }
 
 func (cc *Context) Done() Result {
-	cc.errors = nil
 	return cc.errors
 }
 

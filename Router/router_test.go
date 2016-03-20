@@ -118,7 +118,7 @@ func TestTreeIndicesBug(t *testing.T) {
 
 var router = New()
 
-func TestSetup(t *testing.T) {
+func init() {
 	for _, v := range testTable {
 		v := v
 		router.AddRoute("GET", v[0], func(w http.ResponseWriter, r *http.Request, vp Values) {

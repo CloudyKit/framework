@@ -8,7 +8,7 @@ type User struct {
 	Email     string
 }
 
-func runValidation(u interface{}) []error {
+func runValidation(u interface{}) Result {
 	return New(u).
 		At("FirstName",
 			NoEmpty("First Name can't be empty")).
@@ -24,7 +24,7 @@ func TestSimpleValidation(t *testing.T) {
 
 	var testData = []struct {
 		d interface{}
-		v func(interface{}) []error
+		v func(interface{}) Result
 		e bool
 	}{
 		{User{}, runValidation, true},
@@ -37,7 +37,7 @@ func TestSimpleValidation(t *testing.T) {
 			FirstName: "TestName",
 			LastName:  "LastName",
 			Email:     "email+name@gmail.com",
-		}, runValidation, true},
+		}, runValidation, false},
 		{User{
 			FirstName: "TestName",
 			LastName:  "LastName",

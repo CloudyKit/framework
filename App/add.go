@@ -15,19 +15,19 @@ func (fn FuncHandler) Handle(c *Request.Context) {
 	fn(c)
 }
 
-func (add *AppContext) AddFunc(method, path string, fn FuncHandler, filters ...func(Request.Channel)) {
+func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(Request.Channel)) {
 	add.AddHandler(method, path, fn, filters...)
 }
 
-func (app *AppContext) AddHandler(method, path string, handler Request.Handler, filters ...func(Request.Channel)) {
+func (app *Application) AddHandler(method, path string, handler Request.Handler, filters ...func(Request.Channel)) {
 	app.AddHandlerName("", method, path, handler, filters...)
 }
 
-func (app *AppContext) AddHandlerName(name, method, path string, handler Request.Handler, filters ...func(Request.Channel)) {
+func (app *Application) AddHandlerName(name, method, path string, handler Request.Handler, filters ...func(Request.Channel)) {
 	app.Router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v Router.Values) {
-		cc := Request.New(Request.Context{Name: name, Rw: rw, R: r, Ps: v, Context: app.Child()})
+		cc := Request.New(Request.Context{Id: name, Rw: rw, Rq: r, Ps: v, Context: app.Child()})
 		defer cc.Done()
-		cc.Inject(cc) // self inject
+		cc.Put(cc) // self inject
 		(Request.Channel{
 			Filters: filters,
 			Handler: handler,
@@ -36,11 +36,11 @@ func (app *AppContext) AddHandlerName(name, method, path string, handler Request
 	})
 }
 
-type Controller interface {
+type MuxHandler interface {
 	Mux(Mapper)
 }
 
-func (app *AppContext) AddController(controllers ...Controller) {
+func (app *Application) AddController(controllers ...MuxHandler) {
 	for i := 0; i < len(controllers); i++ {
 		controller := controllers[i]
 

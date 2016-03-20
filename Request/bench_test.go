@@ -1,7 +1,8 @@
-package Request
+package Request_test
 
 import (
 	"github.com/CloudyKit/framework/App"
+	. "github.com/CloudyKit/framework/Request"
 	"net/http"
 	"testing"
 )

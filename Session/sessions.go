@@ -135,7 +135,7 @@ func SetupSessionProvider(c Di.Context, sm *Manager, so *CookieOptions) {
 		rctx := c.Get((*Request.Context)(nil)).(*Request.Context)
 		sess := &sessionFinalizer{Manager: sm, Session: make(SessionContext)}
 
-		rCookie, _ := rctx.R.Cookie(so.Name)
+		rCookie, _ := rctx.Rq.Cookie(so.Name)
 		if rCookie == nil {
 			// generate new session
 			sess.Id = sm.Generator.Generate(so.Name)
