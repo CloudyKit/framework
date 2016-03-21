@@ -25,7 +25,7 @@ func (app *Application) AddHandler(method, path string, handler Request.Handler,
 
 func (app *Application) AddHandlerName(name, method, path string, handler Request.Handler, filters ...func(Request.Channel)) {
 	app.Router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v Router.Values) {
-		cc := Request.New(Request.Context{Id: name, Rw: rw, Rq: r, Ps: v, Context: app.Child()})
+		cc := Request.New(Request.Context{Id: name, Rw: rw, Rq: r, Rv: v, Context: app.Child()})
 		defer cc.Done()
 		cc.Put(cc) // self inject
 		(Request.Channel{

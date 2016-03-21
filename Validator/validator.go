@@ -1,6 +1,7 @@
 package Validator
 
 import (
+	"github.com/CloudyKit/framework/Router"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -8,6 +9,24 @@ import (
 
 type Tester func(c *Context)
 type Provider func(i string) reflect.Value
+
+func NewURLValueProvider(vl url.Values) Provider {
+	return func(name string) reflect.Value {
+		return reflect.ValueOf(vl.Get(name))
+	}
+}
+
+func NewRequestValueProvider(vl *http.Request) Provider {
+	return func(name string) reflect.Value {
+		return reflect.ValueOf(vl.FormValue(name))
+	}
+}
+
+func NewRouterValueProvider(vl Router.Values) Provider {
+	return func(name string) reflect.Value {
+		return reflect.ValueOf(vl.Get(name))
+	}
+}
 
 type Error struct {
 	Field, Description string
@@ -57,20 +76,10 @@ func (cc *Context) At(fieldName string, vs ...Tester) *Context {
 }
 
 func New(target interface{}) *Context {
-	switch target := target.(type) {
-	case *http.Request:
-		return &Context{provider: func(key string) reflect.Value {
-			return reflect.ValueOf(target.FormValue(key))
-		}}
-	case url.Values:
-		return &Context{provider: func(key string) reflect.Value {
-			return reflect.ValueOf(target.Get(key))
-		}}
-	case Provider:
+	if target, isProvider := target.(Provider); isProvider {
 		return &Context{provider: target}
-	default:
-		return &Context{target: reflect.Indirect(reflect.ValueOf(target))}
 	}
+	return &Context{target: reflect.Indirect(reflect.ValueOf(target))}
 }
 
 type At func(fieldName string, vs ...Tester) *Context

@@ -2,7 +2,6 @@ package Di
 
 import (
 	"fmt"
-	"io"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -15,12 +14,16 @@ type (
 		values     map[reflect.Type]interface{}
 	}
 
-	closer interface {
-		Close()
+	finalizer interface {
+		Finalize()
 	}
 
-	done interface {
-		Done()
+	provider interface {
+		Provide(c Context) interface{}
+	}
+
+	providerSetter interface {
+		Provide(c Context, field reflect.Value)
 	}
 )
 
@@ -40,7 +43,6 @@ func Walkable(v ...interface{}) uint {
 	for i := 0; i < len(v); i++ {
 		typ := reflect.TypeOf(v[i])
 	TRY:
-
 		switch typ.Kind() {
 		case reflect.Struct:
 		case reflect.Ptr:
@@ -87,7 +89,7 @@ func (c Context) injectfields(value reflect.Value) {
 	for i := 0; i < numFields; i++ {
 		field := value.Field(i)
 		fieldTyp := field.Type()
-		if provided_value := c.Val4Type(fieldTyp); provided_value != nil {
+		if provided_value := c.val4TypeField(fieldTyp, field); provided_value != nil {
 			field.Set(reflect.ValueOf(provided_value))
 		} else {
 			if _, ok := walkableFields[fieldTyp]; ok {
@@ -161,11 +163,31 @@ func (_context *private_Context) val4type(typ reflect.Type) (val interface{}) {
 	return
 }
 
+// val4TypeField returns a value for the specified type typ
+func (c Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}) {
+	val = c.val4type(typ)
+	switch provider := val.(type) {
+	case func(Context) interface{}:
+		val = provider(c)
+	case func(Context, reflect.Value):
+		provider(c, valOf)
+		val = nil
+	case provider:
+		val = provider.Provide(c)
+	case providerSetter:
+		provider.Provide(c, valOf)
+		val = nil
+	}
+	return
+}
+
 // Val4Type returns a value for the specified type typ
 func (c Context) Val4Type(typ reflect.Type) (val interface{}) {
 	val = c.val4type(typ)
 	if valFn, ok := val.(func(Context) interface{}); ok {
 		val = valFn(c)
+	} else if _provider, isProvider := val.(provider); isProvider {
+		val = _provider.Provide(c)
 	}
 	return
 }
@@ -179,6 +201,7 @@ func (c Context) Get(typ interface{}) interface{} {
 func (c *private_Context) Done() {
 	// check if this is the last active reference
 	c.references = atomic.AddInt64(&c.references, -1)
+
 	if c.references == -1 {
 		c.finalize()
 	} else if c.references < -1 {
@@ -194,20 +217,17 @@ func (c *private_Context) finalize() {
 	if c.parent != nil {
 		defer c.parent.Done()
 	}
+
 	//runs recycle here
 	for _typ, _val := range c.values {
-		switch _val := _val.(type) {
-		case io.Closer:
-			_val.Close()
-		case closer:
-			_val.Close()
-		case done:
-			_val.Done()
-		}
-		// not delete keys for caching
+		// not delete the keys
 		c.values[_typ] = nil
+		if _finalizer, isFinalizer := _val.(finalizer); isFinalizer {
+			_finalizer.Finalize()
+		}
 	}
+
 	c.references = 0
-	pool.Put(c)
 	c.parent = nil
+	pool.Put(c)
 }

@@ -11,12 +11,12 @@ type IdGenerator interface {
 }
 
 type Serializer interface {
-	Serialize(src interface{}, w io.Writer) error
-	Unserialize(dst interface{}, r io.Reader) error
+	Serialize(src interface{}, w io.Writer)
+	Unserialize(dst interface{}, r io.Reader)
 }
 
 type Store interface {
-	Reader(name string) (io.ReadCloser, error)
-	Writer(name string) (io.WriteCloser, error)
-	Gc(before time.Time) error
+	Reader(name string) io.ReadCloser
+	Writer(name string) io.WriteCloser
+	Gc(before time.Time)
 }

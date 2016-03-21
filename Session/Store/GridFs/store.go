@@ -39,41 +39,49 @@ type Store struct {
 	db, prefix string
 }
 
-func (sessionStore *Store) gridFs(name string, create bool) (*sessionCloser, error) {
+func (sessionStore *Store) gridFs(name string, create bool) (*sessionCloser) {
 	session := sessionStore.session()
 	session.SetMode(mgo.Strong, false)
 	gridFs := session.DB(sessionStore.db).GridFS(sessionStore.prefix)
 	if create {
 		gridFs.Remove(name)
 		gridFile, err := gridFs.Create(name)
-		return &sessionCloser{session: session, GridFile: gridFile}, err
+		if err != nil {
+			panic(err)
+		}
+		return &sessionCloser{session: session, GridFile: gridFile}
 	}
 	gridFile, err := gridFs.Open(name)
-	return &sessionCloser{session: session, GridFile: gridFile}, err
+	if err != nil {
+		panic(err)
+	}
+	return &sessionCloser{session: session, GridFile: gridFile}
 }
 
-func (sessionStore *Store) Writer(name string) (writer io.WriteCloser, err error) {
-	writer, err = sessionStore.gridFs(name, true)
-	return
+func (sessionStore *Store) Writer(name string) (writer io.WriteCloser) {
+	return sessionStore.gridFs(name, true)
 }
 
-func (sessionStore *Store) Reader(name string) (reader io.ReadCloser, err error) {
-	reader, err = sessionStore.gridFs(name, false)
-	return
+func (sessionStore *Store) Reader(name string) (reader io.ReadCloser) {
+	return sessionStore.gridFs(name, false)
 }
 
-func (sessionStore *Store) Gc(before time.Time) error {
+func (sessionStore *Store) Gc(before time.Time) {
 	sess := sessionStore.session()
 	defer sess.Close()
 
 	gridFs := sess.DB(sessionStore.db).GridFS(sessionStore.prefix)
+
 	var fileId struct {
 		Id bson.ObjectId `bson:"_id"`
 	}
+
 	inter := gridFs.Find(qm.Lt("uploadDate", before)).Iter()
 	defer inter.Close()
+
 	for inter.Next(&fileId) {
 		gridFs.RemoveId(fileId.Id)
 	}
-	return nil
+
+	return
 }

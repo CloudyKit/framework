@@ -4,19 +4,17 @@ import (
 	"github.com/CloudyKit/framework/Di"
 	"github.com/CloudyKit/framework/Router"
 
-	"encoding/json"
 	"net/http"
 	"sync"
 )
 
 type Context struct {
-	Di.Context
+	Di.Context        // Depedency injection base
+	Id         string // The id associated with this route
 
-	Rq *http.Request
-	Rw http.ResponseWriter
-
-	Ps Router.Values
-	Id string
+	Rq *http.Request       // Request data passed by the router
+	Rw http.ResponseWriter // Response Writer passed by the router
+	Rv Router.Values       // Route Variables passed by the router
 }
 
 var _New = sync.Pool{
@@ -31,23 +29,19 @@ func New(c Context) (cc *Context) {
 	return
 }
 
-func (cc *Context) ReceiveJson(target interface{}) error {
-	return json.NewDecoder(cc.Rq.Body).Decode(target)
-}
-
-func (cc *Context) SendJson(from interface{}) error {
-	return json.NewEncoder(cc.Rw).Encode(from)
-}
-
 func (cc *Context) Done() {
-	defer _New.Put(cc)
+
+	di := cc.Context // copy
+
+	// reset the values
 	cc.Rq = nil
 	cc.Rw = nil
-	cc.Ps.Values = nil
-	cc.Context.Done()
+	cc.Rv = Router.Values{}
 	cc.Context = Di.Context{}
-}
 
-func (cc *Context) SendText(txt string) (int, error) {
-	return cc.Rw.Write([]byte(txt))
+	// recycle cc
+	_New.Put(cc)
+
+	// recycle depedency injection table
+	di.Done()
 }
