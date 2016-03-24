@@ -1,43 +1,63 @@
 package Router
 
-import "strconv"
+import "strings"
 
 type Values struct {
-	Keys   []string
-	Values []string
+	*node
+	path     string
+	wildcard int
 }
 
-func (variables Values) Empty() bool {
-	return variables.Keys == nil
-}
-
-func (variables Values) Get(name string) string {
-	for i := 0; i < len(variables.Keys); i++ {
-		if variables.Keys[i] == name {
-			return variables.Values[i]
-		}
-	}
-	return ""
-}
-
-func (variables Values) GetIdx(name string) int {
-	for i := 0; i < len(variables.Keys); i++ {
-		if variables.Keys[i] == name {
-			return i
-		}
+func (vv Values) Index(name string) int {
+	if i, has := vv.namesidx[name]; has {
+		return i
 	}
 	return -1
 }
 
-func (variables Values) First() string {
-	return variables.Values[0]
+func (vv Values) Get(name string) string {
+	if i, has := vv.namesidx[name]; has {
+		return vv.findParam(i)
+	}
+	return ""
 }
 
-func (variables Values) Int(name string) (int, bool) {
-	var idx = variables.GetIdx(name)
-	if idx == -1 {
-		return 0, false
+func (vv Values) findParam(idx int) (param string) {
+	curIndex := len(vv.names) - 1
+	urlPath := vv.path
+	pathLen := len(vv.path)
+	_node := vv.node
+
+	if _node.text == "*" {
+		pathLen -= vv.wildcard
+		if curIndex == idx {
+			param = urlPath[pathLen:]
+			return
+		}
+		curIndex--
+		_node = _node.parent
 	}
-	intv, err := strconv.ParseInt(variables.Values[idx], 10, strconv.IntSize)
-	return int(intv), err == nil
+
+	for ; _node != nil; _node = _node.parent {
+		if _node.text == ":" {
+
+			ctn := strings.LastIndexByte(urlPath, '/')
+			if ctn == -1 {
+				break
+			}
+
+			pathLen = ctn + 1
+
+			if curIndex == idx {
+				param = urlPath[pathLen:]
+				break
+			}
+			curIndex--
+		} else {
+			pathLen -= len(_node.text)
+		}
+
+		urlPath = urlPath[0:pathLen]
+	}
+	return
 }

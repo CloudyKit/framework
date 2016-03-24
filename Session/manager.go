@@ -19,9 +19,9 @@ type CookieOptions struct {
 }
 
 type Manager struct {
+	Generator  IdGenerator
 	Store      Store
 	Serializer Serializer
-	Generator  IdGenerator
 	Duration   time.Duration
 	gcEvery    time.Duration
 	gcLastCall time.Time

@@ -1,11 +1,13 @@
 package Session
 
 import (
-	"encoding/gob"
 	"github.com/CloudyKit/framework/App"
 	"github.com/CloudyKit/framework/Di"
 	"github.com/CloudyKit/framework/Request"
 	"github.com/CloudyKit/framework/Session/Store/File"
+
+	"encoding/gob"
+	"github.com/CloudyKit/framework/View"
 	"net/http"
 	"sync"
 	"time"
@@ -26,25 +28,27 @@ var (
 )
 
 func init() {
-
 	gob.Register(Context{})
 	gob.Register(FlashContext{})
 	//setup the default's
-	SetupSessionProvider(App.Default.Context, DefaultManager, DefaultCookieOptions)
+	SetupSessionProvider(App.Default.Di, DefaultManager, DefaultCookieOptions)
 }
 
 func New(gcEvery time.Duration, duration time.Duration, store Store, serializer Serializer, generator IdGenerator) *Manager {
 	return &Manager{
+		Generator:  generator,
 		gcEvery:    gcEvery,
 		Duration:   duration,
 		Store:      store,
 		Serializer: serializer,
-		Generator:  generator,
 	}
 }
 
 const flashWritingKey = "__wflash#session"
 const flashReadingKey = "__rflash#session"
+
+var _ = View.AvailableKey(View.DefaultManager, "Session", Context(nil))
+var _ = View.AvailableKey(View.DefaultManager, "Flashes", FlashContext(nil))
 
 type Context map[string]interface{}
 type FlashContext map[string]interface{}
@@ -60,12 +64,18 @@ func (s Context) HasFlash(k string) (has bool) {
 	return
 }
 
+// Has check if the k is set
+func (s Context) Has(k string) (has bool) {
+	_, has = s[k]
+	return
+}
+
 // ReadFlash reads a flash variable from the session
 func (s Context) ReadFlash(k string) interface{} {
 	return s.Flashes()[k]
 }
 
-// ReadWritingFlash reads a flash variable which is marked to be written
+// ReadWritingFlash reads a flash variable which is marked to be re|written
 func (s Context) ReadWritingFlash(k string) interface{} {
 	return s.wflashes(false)[k]
 }
@@ -103,6 +113,11 @@ func (s Context) Reflash() {
 	}
 }
 
+func (f FlashContext) Has(name string) (has bool) {
+	_, has = f[name]
+	return
+}
+
 type sessionFinalizer struct {
 	Id      string
 	Manager *Manager
@@ -128,7 +143,7 @@ func (sessFinalizerMem *sessionFinalizer) Finalize() {
 
 // SetupSessionProvider this func will create an session loader into the context, the recommended
 // way is to pass the app context
-func SetupSessionProvider(c Di.Context, sm *Manager, so *CookieOptions) {
+func SetupSessionProvider(c *Di.Context, sm *Manager, so *CookieOptions) {
 
 	if sm == nil {
 		sm = DefaultManager
@@ -137,14 +152,21 @@ func SetupSessionProvider(c Di.Context, sm *Manager, so *CookieOptions) {
 		so = DefaultCookieOptions
 	}
 
-	c.Set((Context)(nil), func(c Di.Context) interface{} {
+	// make flashes injectable depends on session
+	c.Set((FlashContext)(nil), func(c *Di.Context) interface{} {
+		session := c.Get((Context)(nil)).(Context)
+		return session.Flashes()
+	})
+
+	// make session injectable
+	c.Set((Context)(nil), func(c *Di.Context) interface{} {
 		rctx := c.Get((*Request.Context)(nil)).(*Request.Context)
 
 		sess, _ := finalizersPool.Get().(*sessionFinalizer)
 		sess.Manager = sm
 		sess.Session = make(Context)
 
-		rCookie, _ := rctx.Rq.Cookie(so.Name)
+		rCookie, _ := rctx.Request.Cookie(so.Name)
 		if rCookie == nil {
 			// generate new session
 			sess.Id = sm.Generator.Generate(so.Name)

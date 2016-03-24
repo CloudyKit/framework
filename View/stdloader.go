@@ -51,7 +51,7 @@ func (stdLoader *StdTemplateLoader) autoLoad(list *parse.ListNode) {
 
 type stdRender template.Template
 
-func (tt *stdRender) Execute(w io.Writer, c Table) error {
+func (tt *stdRender) Execute(w io.Writer, c Data) error {
 	return (*template.Template)(tt).Execute(w, c)
 }
 

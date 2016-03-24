@@ -39,7 +39,7 @@ type Store struct {
 	db, prefix string
 }
 
-func (sessionStore *Store) gridFs(name string, create bool) (*sessionCloser) {
+func (sessionStore *Store) gridFs(name string, create bool) *sessionCloser {
 	session := sessionStore.session()
 	session.SetMode(mgo.Strong, false)
 	gridFs := session.DB(sessionStore.db).GridFS(sessionStore.prefix)

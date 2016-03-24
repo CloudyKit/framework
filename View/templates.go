@@ -3,9 +3,11 @@ package View
 import (
 	"errors"
 	"github.com/CloudyKit/framework/App"
+	"github.com/CloudyKit/framework/Common"
 	"github.com/CloudyKit/framework/Di"
 	"github.com/CloudyKit/framework/Request"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -16,32 +18,51 @@ var DefaultManager = &Manager{}
 var DefaultStdLoader = NewStdTemplateLoader("./views")
 
 func init() {
-	Di.Walkable(Context{})
-	App.Default.Put(DefaultManager)
-	App.Default.Set((Table)(nil), func(c Di.Context) interface{} {
-		tt := tablePool.Get()
+
+	App.Default.Di.Put(DefaultManager)
+
+	App.Default.Di.Set((*Context)(nil), func(c *Di.Context) interface{} {
+		tt := DefaultManager.NewContext(c)
 		c.Put(tt)
 		return tt
 	})
+
+	Available(DefaultManager, (*Request.Context)(nil))
+	AvailableKey(DefaultManager, "linker", (*Common.URLer)(nil))
 	DefaultManager.AddLoader(DefaultStdLoader, ".tpl", ".tpl.html")
 }
 
-type Table map[string]interface{}
+func (m *Manager) NewContext(c *Di.Context) *Context {
+	tt := contextPool.Get().(*Context)
 
-var tablePool = sync.Pool{
+	// init
+	tt.Manager = m
+	tt.Context = c.Get(tt.Context).(*Request.Context)
+
+	// update auto variables
+	for i := 0; i < len(m.injectables); i++ {
+		tt.Data[m.injectables[i].name] = c.Val4Type(m.injectables[i].typ)
+	}
+
+	return tt
+}
+
+type Data map[string]interface{}
+
+var contextPool = sync.Pool{
 	New: func() interface{} {
-		return make(Table)
+		return &Context{Data: make(Data)}
 	},
 }
 
-func (t Table) Finalize() {
-	tablePool.Put(t)
+type Context struct {
+	Manager *Manager //Manager is
+	Context *Request.Context
+	Data    Data
 }
 
-type Context struct {
-	Manager *Manager
-	Context *Request.Context
-	Data    Table
+func (t *Context) Finalize() {
+	contextPool.Put(t)
 }
 
 type RendererList struct {
@@ -69,12 +90,12 @@ func (r Context) Renderer(v Renderer) error {
 	return v.Render(r)
 }
 
-func (r Context) Render(view string, context Table) error {
+func (r Context) Render(view string, context Data) error {
 	return r.Manager.Render(r.Context.Rw, view, context)
 }
 
 type ViewRenderer interface {
-	Execute(w io.Writer, c Table) error
+	Execute(w io.Writer, c Data) error
 }
 
 type ViewLoader interface {
@@ -100,11 +121,17 @@ func (s viewHandlers) Less(i, j int) bool {
 	return len(s[i].ext) > len(s[j].ext)
 }
 
-type Manager struct {
-	loaders viewHandlers
+type autoset struct {
+	name string
+	typ  reflect.Type
 }
 
-func (vm *Manager) Render(w io.Writer, name string, context Table) (err error) {
+type Manager struct {
+	loaders     viewHandlers
+	injectables []autoset
+}
+
+func (vm *Manager) Render(w io.Writer, name string, context Data) (err error) {
 	var view ViewRenderer
 	view, err = vm.getView(name)
 	if err == nil {

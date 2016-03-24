@@ -8,13 +8,18 @@ import (
 type node struct {
 	text     string
 	names    []string
+	namesidx map[string]int
 	handler  Handler
+
+	root     *node
+	parent   *node
 	wildcard *node
 	colon    *node
-	nodes    nodes
-	start    byte
-	max      byte
-	indices  []uint8
+
+	nodes   nodes
+	start   byte
+	max     byte
+	indices []uint8
 }
 
 type nodes []*node
@@ -92,7 +97,8 @@ RESTART:
 	if cNode == nil {
 		cNode = &node{text: parts[0]}
 		_node.nodes = append(_node.nodes, cNode)
-	} else if result == 1 { //
+	} else if result == 1 {
+		//
 		parts[0] = parts[0][len(cNode.text):]
 		ccNode, result, idx = cNode.nextRoute(parts[0])
 		if cNode != nil {
@@ -120,80 +126,59 @@ RESTART:
 	cNode.addRoute(parts[1:], names, handler)
 }
 
-func (_node *node) findRoute(urlPath string, paramIndex uint8) (*node, []string) {
+func (_node *node) findRoute(urlPath string) (*node, int) {
 
-	pathLen := len(urlPath)
 	urlByte := urlPath[0]
-	// check for range, ex: start=a len=3 byte=b  a,[b],c...
-	if urlByte >= _node.start && urlByte <= _node.max {
+	pathLen := len(urlPath)
 
+	if urlByte >= _node.start && urlByte <= _node.max {
 		if i := _node.indices[urlByte-_node.start]; i != 0 {
 			cNode := _node.nodes[i-1]
 			nodeLen := len(cNode.text)
-			if nodeLen > pathLen {
-				goto COLON
-			}
-
 			if nodeLen < pathLen {
 				if cNode.text == urlPath[0:nodeLen] {
-					if cNode, values := cNode.findRoute(urlPath[nodeLen:], paramIndex); cNode != nil {
-						return cNode, values
+					if cNode, wildcard := cNode.findRoute(urlPath[nodeLen:]); cNode != nil {
+						return cNode, wildcard
 					}
 				}
-				goto COLON
-			}
-
-			if cNode.text == urlPath {
-				if cNode.handler == nil {
-					if cNode.wildcard != nil {
-						values := make([]string, paramIndex+1, paramIndex+1)
-						values[paramIndex] = ""
-						return cNode.wildcard, values
-					}
+			} else if cNode.text == urlPath {
+				if cNode.handler == nil && cNode.wildcard != nil {
+					return cNode.wildcard, 0
 				}
-				return cNode, nil
+				return cNode, 0
 			}
 		}
 	}
 
-COLON:
-	if _node.colon != nil {
-		for ix := 0; ix < pathLen; ix++ {
-			if urlPath[ix] == '/' {
-				if _node, values := _node.colon.findRoute(urlPath[ix:], paramIndex+1); _node != nil {
-					if values == nil {
-						values = make([]string, paramIndex+1, paramIndex+1)
-					}
-					values[paramIndex] = urlPath[0:ix]
-					return _node, values
-				}
-				goto WILDCARD
+	if _node.colon != nil && pathLen != 0 {
+		ix := strings.IndexByte(urlPath, '/')
+		if ix > 0 {
+			if cNode, wildcard := _node.colon.findRoute(urlPath[ix:]); cNode != nil {
+				return cNode, wildcard
 			}
-		}
-
-		if pathLen > 0 {
-			values := make([]string, paramIndex+1, paramIndex+1)
-			values[paramIndex] = urlPath
-			return _node.colon, values
+		} else if _node.colon.handler != nil {
+			return _node.colon, 0
 		}
 	}
 
-WILDCARD:
 	if _node.wildcard != nil {
-		values := make([]string, paramIndex+1, paramIndex+1)
-		values[paramIndex] = urlPath
-		return _node.wildcard, values
+		return _node.wildcard, pathLen
 	}
 
-	return nil, nil
+	return nil, 0
 }
 
 func (_node *node) optimizeRoutes() {
 
+	if _node.namesidx == nil {
+		_node.namesidx = make(map[string]int)
+		for i := 0; i < len(_node.names); i++ {
+			_node.namesidx[_node.names[i]] = i //index names
+		}
+	}
+
 	if len(_node.nodes) > 0 {
-
 		sort.Sort(_node.nodes)
-
 		for i := 0; i < len(_node.indices); i++ {
 			_node.indices[i] = 0
 		}
@@ -203,6 +188,8 @@ func (_node *node) optimizeRoutes() {
 
 		for i := 0; i < len(_node.nodes); i++ {
 			cNode := _node.nodes[i]
+			cNode.parent = _node
+
 			cByte := int(cNode.text[0] - _node.start)
 			if cByte >= len(_node.indices) {
 				_node.indices = append(_node.indices, make([]uint8, cByte+1-len(_node.indices))...)
@@ -213,11 +200,29 @@ func (_node *node) optimizeRoutes() {
 	}
 
 	if _node.colon != nil {
+		_node.colon.parent = _node
 		_node.colon.optimizeRoutes()
 	}
+
 	if _node.wildcard != nil {
+		_node.wildcard.parent = _node
 		_node.wildcard.optimizeRoutes()
 	}
+}
+
+func (_node *node) finalize() {
+	if len(_node.nodes) > 0 {
+		for i := 0; i < len(_node.nodes); i++ {
+			_node.nodes[i].finalize()
+		}
+	}
+	if _node.colon != nil {
+		_node.colon.finalize()
+	}
+	if _node.wildcard != nil {
+		_node.wildcard.finalize()
+	}
+	*_node = node{}
 }
 
 func (_node *node) string(col int) string {
@@ -241,8 +246,6 @@ func (_node *node) String() string {
 	if _node.text == "" {
 		return _node.string(0)
 	}
-	//	fmt.Println("START PRINTING")
-	//	defer fmt.Println("END PRINTING")
 	col := len(_node.text) + 4
 	return _node.text + " -> " + _node.string(col)
 }

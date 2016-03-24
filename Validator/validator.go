@@ -24,6 +24,9 @@ func NewRequestValueProvider(vl *http.Request) Provider {
 
 func NewRouterValueProvider(vl Router.Values) Provider {
 	return func(name string) reflect.Value {
+		if vl.Index(name) == -1 {
+			return reflect.Value{}
+		}
 		return reflect.ValueOf(vl.Get(name))
 	}
 }

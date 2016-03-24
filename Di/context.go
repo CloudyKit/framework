@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	private_Context struct {
-		parent     *private_Context
+	Context struct {
+		parent     *Context
 		references int64
 		values     map[reflect.Type]interface{}
 	}
@@ -19,18 +19,18 @@ type (
 	}
 
 	provider interface {
-		Provide(c Context) interface{}
+		Provide(c *Context) interface{}
 	}
 
 	providerSetter interface {
-		Provide(c Context, field reflect.Value)
+		Provide(c *Context, field reflect.Value)
 	}
 )
 
 var (
 	pool = sync.Pool{
 		New: func() interface{} {
-			cc := new(private_Context)
+			cc := new(Context)
 			cc.values = make(map[reflect.Type]interface{})
 			return cc
 		},
@@ -58,18 +58,15 @@ func Walkable(v ...interface{}) uint {
 }
 
 // New creates a new instance of context object
-func New() (cc Context) {
-	cc.private_Context = pool.Get().(*private_Context)
+func New() (cc *Context) {
+	cc = pool.Get().(*Context)
 	return
 }
 
 // Context holds the dependency injection data
-type Context struct {
-	*private_Context
-}
 
 // Inject walks the target looking the exported fields for injectable values
-func (c Context) Inject(target interface{}) {
+func (c *Context) Inject(target interface{}) {
 	value := reflect.ValueOf(target)
 
 	if value.Kind() == reflect.Ptr {
@@ -84,7 +81,7 @@ func (c Context) Inject(target interface{}) {
 }
 
 // injectfields walks the struct value looking to injectable fields
-func (c Context) injectfields(value reflect.Value) {
+func (c *Context) injectfields(value reflect.Value) {
 	numFields := value.NumField()
 	for i := 0; i < numFields; i++ {
 		field := value.Field(i)
@@ -100,22 +97,26 @@ func (c Context) injectfields(value reflect.Value) {
 }
 
 // Set sets a provider for the type of typ with value of val
-func (c Context) Set(typ, val interface{}) {
-	c.values[reflect.TypeOf(typ)] = val
+func (c *Context) Set(typ, val interface{}) {
+	typOf := reflect.TypeOf(typ)
+	if typOf.Kind() == reflect.Ptr && typOf.Elem().Kind() == reflect.Interface {
+		typOf = typOf.Elem()
+	}
+	c.values[typOf] = val
 }
 
 // Put puts the list of values into the current context
-func (c Context) Put(value ...interface{}) {
+func (c *Context) Put(value ...interface{}) {
 	for i := 0; i < len(value); i++ {
 		vof := value[i]
 		v := reflect.ValueOf(vof)
-		c.private_Context.values[v.Type()] = vof
+		c.values[v.Type()] = vof
 	}
 }
 
 // From put in to the context all child values from the provided value
 // example all exported fields from a Struct or itens from a Slice
-func (c Context) From(st interface{}) {
+func (c *Context) From(st interface{}) {
 	v := reflect.ValueOf(st)
 RESTART:
 	switch v.Kind() {
@@ -127,7 +128,7 @@ RESTART:
 		for i := 0; i < length; i++ {
 			field := v.Index(i)
 			if field.CanInterface() {
-				c.private_Context.values[field.Type()] = field.Interface()
+				c.values[field.Type()] = field.Interface()
 			}
 		}
 	case reflect.Struct:
@@ -135,7 +136,7 @@ RESTART:
 		for i := 0; i < numFields; i++ {
 			field := v.Field(i)
 			if field.CanInterface() {
-				c.private_Context.values[field.Type()] = field.Interface()
+				c.values[field.Type()] = field.Interface()
 			}
 		}
 	default:
@@ -144,15 +145,15 @@ RESTART:
 }
 
 // Child creates a new context using current values repository as provider for the new context
-func (c Context) Child() (child Context) {
+func (c *Context) Child() (child *Context) {
 	c.references = atomic.AddInt64(&c.references, 1)
-	child.private_Context = pool.Get().(*private_Context)
-	child.parent = c.private_Context
+	child = New()
+	child.parent = c
 	return
 }
 
 // val4type walkings the context from the current to the top parent looking for the value with type typ
-func (_context *private_Context) val4type(typ reflect.Type) (val interface{}) {
+func (_context *Context) val4type(typ reflect.Type) (val interface{}) {
 	for {
 		val = _context.values[typ]
 		if val != nil || _context.parent == nil {
@@ -164,12 +165,12 @@ func (_context *private_Context) val4type(typ reflect.Type) (val interface{}) {
 }
 
 // val4TypeField returns a value for the specified type typ
-func (c Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}) {
+func (c *Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}) {
 	val = c.val4type(typ)
 	switch provider := val.(type) {
-	case func(Context) interface{}:
+	case func(*Context) interface{}:
 		val = provider(c)
-	case func(Context, reflect.Value):
+	case func(*Context, reflect.Value):
 		provider(c, valOf)
 		val = nil
 	case provider:
@@ -182,9 +183,9 @@ func (c Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val inter
 }
 
 // Val4Type returns a value for the specified type typ
-func (c Context) Val4Type(typ reflect.Type) (val interface{}) {
+func (c *Context) Val4Type(typ reflect.Type) (val interface{}) {
 	val = c.val4type(typ)
-	if valFn, ok := val.(func(Context) interface{}); ok {
+	if valFn, ok := val.(func(*Context) interface{}); ok {
 		val = valFn(c)
 	} else if _provider, isProvider := val.(provider); isProvider {
 		val = _provider.Provide(c)
@@ -193,12 +194,12 @@ func (c Context) Val4Type(typ reflect.Type) (val interface{}) {
 }
 
 // Get returns a value for the type of typ
-func (c Context) Get(typ interface{}) interface{} {
+func (c *Context) Get(typ interface{}) interface{} {
 	return c.Val4Type(reflect.TypeOf(typ))
 }
 
 // Done should be called when the context is not being used anymore
-func (c *private_Context) Done() {
+func (c *Context) Done() {
 	// check if this is the last active reference
 	c.references = atomic.AddInt64(&c.references, -1)
 
@@ -212,7 +213,7 @@ func (c *private_Context) Done() {
 // finalize walks all values in the current context and invokes finalizers
 // decrease reference counter into the parent
 // and recycle the private data
-func (c *private_Context) finalize() {
+func (c *Context) finalize() {
 	// invokes parent Done method
 	if c.parent != nil {
 		defer c.parent.Done()

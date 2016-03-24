@@ -1,6 +1,7 @@
 package Router
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -22,7 +23,6 @@ func explode(path string) (parts []string, names []string) {
 	)
 
 	for i := 0; i < len(path); i++ {
-
 		// recording name
 		if nameidx != -1 {
 			//found /
@@ -32,19 +32,17 @@ func explode(path string) (parts []string, names []string) {
 				partidx = i
 			}
 		} else {
-
 			if path[i] == ':' || path[i] == '*' {
-
+				if path[i-1] != '/' {
+					panic(fmt.Errorf("Inválid parameter : or * comes anwais after / - %q", path))
+				}
 				nameidx = i + 1
 				if partidx != i {
 					parts = append(parts, path[partidx:i])
 				}
 				parts = append(parts, path[i:nameidx])
-
 			}
-
 		}
-
 	}
 
 	if nameidx != -1 {
@@ -56,26 +54,23 @@ func explode(path string) (parts []string, names []string) {
 	return
 }
 
+func (router *Router) Finalize() {
+	for _, _node := range router.trees {
+		_node.finalize()
+	}
+}
+
 func (router *Router) FindRoute(method string, path string) (Handler, Values) {
 	_node := router.trees[method]
 	if _node == nil {
 		return nil, Values{}
 	}
-	fn, values := _node.findRoute(path, 0)
+	fn, wildcard := _node.findRoute(path)
 	if fn != nil {
-		return fn.handler, Values{Keys: fn.names, Values: values}
+		return fn.handler, Values{node: fn, path: path, wildcard: wildcard}
 	}
 	return nil, Values{}
 }
-
-//func (router *Router) FindRouteLoop(method string, path string) (Handler, Values) {
-//	_node := router.trees[method]
-//	if _node == nil {
-//		return nil, Values{}
-//	}
-//	fn, names, values := _node._findRoute(path, 0)
-//	return fn, Values{Keys: names, Values: values}
-//}
 
 func (router *Router) AddRoute(method string, path string, fn Handler) {
 	parts, names := explode(path)

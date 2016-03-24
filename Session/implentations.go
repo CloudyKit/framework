@@ -8,6 +8,7 @@ import (
 )
 
 type RandGenerator struct{}
+type GobSerializer struct{}
 
 func (RandGenerator) Generate(name string) string {
 	b := make([]byte, 16)
@@ -17,8 +18,6 @@ func (RandGenerator) Generate(name string) string {
 	}
 	return base64.URLEncoding.EncodeToString(b)
 }
-
-type GobSerializer struct{}
 
 func (serializer GobSerializer) Unserialize(dst interface{}, reader io.Reader) {
 	err := gob.NewDecoder(reader).Decode(dst)
