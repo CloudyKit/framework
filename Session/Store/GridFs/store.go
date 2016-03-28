@@ -1,8 +1,8 @@
 // mgoStore uses the mgo mongo driver to store sessions on mongo gridfs
-package GridFs
+package gridFs
 
 import (
-	"github.com/CloudyKit/framework/Session"
+	"github.com/CloudyKit/framework/session"
 	"github.com/jhsx/qm"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -11,7 +11,7 @@ import (
 )
 
 // New returns a new store
-func New(db, prefix string, mgoSess func() *mgo.Session) Session.Store {
+func New(db, prefix string, mgoSess func() *mgo.Session) session.Store {
 	return &Store{
 		db:      db,
 		prefix:  prefix,
@@ -24,14 +24,15 @@ type sessionCloser struct {
 	*mgo.GridFile
 }
 
-func (ss *sessionCloser) Done() {
+func (ss *sessionCloser) Close() (err error) {
 	if ss.GridFile != nil {
-		if err := ss.GridFile.Close(); err != nil {
+		if err = ss.GridFile.Close(); err != nil {
 			ss.session.Close()
 			return
 		}
 	}
 	ss.session.Close()
+	return
 }
 
 type Store struct {
@@ -64,6 +65,14 @@ func (sessionStore *Store) Writer(name string) (writer io.WriteCloser) {
 
 func (sessionStore *Store) Reader(name string) (reader io.ReadCloser) {
 	return sessionStore.gridFs(name, false)
+}
+
+func (sessionStore *Store) Touch(name string) (err error) {
+	fs := sessionStore.gridFs(name, false)
+	if fs != nil {
+		fs.SetUploadDate(time.Now())
+	}
+	return
 }
 
 func (sessionStore *Store) Gc(before time.Time) {

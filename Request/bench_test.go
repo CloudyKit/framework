@@ -1,14 +1,14 @@
-package Request_test
+package request_test
 
 import (
-	"github.com/CloudyKit/framework/App"
-	. "github.com/CloudyKit/framework/Request"
+	"github.com/CloudyKit/framework/app"
+	. "github.com/CloudyKit/framework/request"
 	"net/http"
 	"testing"
 )
 
 type BenchController struct {
-	Context
+	*Context
 	*testing.B
 }
 
@@ -16,7 +16,7 @@ func invokeNextMiddleware(rf Channel) {
 	rf.Next()
 }
 
-func (bb *BenchController) Mux(m App.Mapper) {
+func (bb *BenchController) Mux(m app.Mapper) {
 	m.AddHandler("GET", "/", "SimpleHandler")
 	m.AddHandler("GET", "/middlewares/1", "SimpleHandler", invokeNextMiddleware)
 	m.AddHandler("GET", "/middlewares/4", "SimpleHandler", invokeNextMiddleware, invokeNextMiddleware, invokeNextMiddleware, invokeNextMiddleware)
@@ -31,7 +31,7 @@ func (bb *BenchController) Mux(m App.Mapper) {
 }
 
 func (c *BenchController) RegisterHandler() {
-	context := c.Child()
+	context := c.Di.Child()
 	defer context.Done()
 }
 
@@ -41,7 +41,7 @@ func (c *BenchController) SimpleHandler() {
 	}
 }
 
-var benchApp = App.New()
+var benchApp = app.New()
 
 func init() {
 	benchApp.AddController(
@@ -49,7 +49,7 @@ func init() {
 	)
 }
 func BenchmarkFlowRequest(b *testing.B) {
-	benchApp.Put(b)
+	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.Router.ServeHTTP(nil, request)
@@ -58,21 +58,21 @@ func BenchmarkFlowRequest(b *testing.B) {
 
 func BenchmarkFlowRequestMiddleware1(b *testing.B) {
 	request, _ := http.NewRequest("GET", "/middlewares/1", nil)
-	benchApp.Put(b)
+	benchApp.Di.Map(b)
 	for i := 0; i < b.N; i++ {
 		benchApp.Router.ServeHTTP(nil, request)
 	}
 }
 
 func BenchmarkFlowRequestMiddleware4(b *testing.B) {
-	benchApp.Put(b)
+	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/4", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.Router.ServeHTTP(nil, request)
 	}
 }
 func BenchmarkFlowRequestMiddleware24(b *testing.B) {
-	benchApp.Put(b)
+	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/24", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.Router.ServeHTTP(nil, request)

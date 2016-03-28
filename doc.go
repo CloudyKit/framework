@@ -1,4 +1,2 @@
-/*
- * CloudyKit Web Framework
- */
+// CloudyKit Web Framework
 package CloudyKit

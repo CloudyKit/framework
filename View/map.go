@@ -1,8 +1,8 @@
-package View
+package view
 
 import (
 	"fmt"
-	"github.com/CloudyKit/framework/Common"
+	"github.com/CloudyKit/framework/common"
 	"reflect"
 )
 
@@ -31,7 +31,7 @@ func AvailableKey(m *Manager, name string, _typ interface{}) error {
 	}
 
 	if name == "" {
-		if _typ, isNamed := _typ.(Common.Named); isNamed {
+		if _typ, isNamed := _typ.(common.Named); isNamed {
 			name = _typ.Name()
 		} else {
 			name = defaultName(typ)

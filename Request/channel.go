@@ -1,15 +1,14 @@
-package Request
+package request
 
-type Filter func(Channel)
 type Filters struct {
-	filters []Filter
+	filters []func(Channel)
 }
 
-func (f *Filters) AddFilter(filters ...Filter) {
+func (f *Filters) AddFilter(filters ...func(Channel)) {
 	f.filters = append(f.filters, filters...)
 }
-func (f *Filters) MakeFilters(filters ...Filter) []Filter {
-	newFilter := make([]Filter, 0, len(f.filters)+len(filters))
+func (f *Filters) MakeFilters(filters ...func(Channel)) []func(Channel) {
+	newFilter := make([]func(Channel), 0, len(f.filters) + len(filters))
 	newFilter = append(newFilter, f.filters...)
 	newFilter = append(newFilter, filters...)
 	return newFilter
@@ -17,7 +16,7 @@ func (f *Filters) MakeFilters(filters ...Filter) []Filter {
 
 type Channel struct {
 	*Context
-	Filters []Filter
+	Filters []func(Channel)
 	Handler Handler
 }
 

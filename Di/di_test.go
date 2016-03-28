@@ -1,4 +1,4 @@
-package Di
+package di
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ func TestDiProvideAndInject(t *testing.T) {
 	var tt testHolder
 
 	// Provide t *testing.T into newContext
-	newContext.Put(t)
+	newContext.Map(t)
 	// Injects t *testing.T into testHolder struct{ *testing.T }
 	newContext.Inject(&tt)
 	// check value was injected successfully
@@ -81,7 +81,7 @@ func BenchmarkInject(b *testing.B) {
 		*testing.B
 	}
 	for i := 0; i < b.N; i++ {
-		context.Put(b)
+		context.Map(b)
 		context.Inject(&tt)
 	}
 }
@@ -92,7 +92,7 @@ func BenchmarkInjectChild(b *testing.B) {
 	}
 	for i := 0; i < b.N; i++ {
 		context := context.Child()
-		context.Put(b)
+		context.Map(b)
 		context.Inject(&tt)
 		context.Done()
 	}

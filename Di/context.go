@@ -1,4 +1,4 @@
-package Di
+package di
 
 import (
 	"fmt"
@@ -106,7 +106,7 @@ func (c *Context) Set(typ, val interface{}) {
 }
 
 // Put puts the list of values into the current context
-func (c *Context) Put(value ...interface{}) {
+func (c *Context) Map(value ...interface{}) {
 	for i := 0; i < len(value); i++ {
 		vof := value[i]
 		v := reflect.ValueOf(vof)

@@ -1,9 +1,10 @@
-package Request
+package request
 
 import (
-	"github.com/CloudyKit/framework/Di"
-	"github.com/CloudyKit/framework/Router"
-	"github.com/CloudyKit/framework/Validator"
+	"github.com/CloudyKit/framework/validator"
+	"github.com/CloudyKit/framework/errors"
+	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/router"
 
 	"encoding/json"
 	"net/http"
@@ -11,39 +12,37 @@ import (
 )
 
 type Context struct {
-	*http.Request // Request data passed by the router
-
-	Id string // The id associated with this route
-
-	Di *Di.Context // Dependency injection context
-
-	Rw http.ResponseWriter // Response Writer passed by the router
-	Rv Router.Values       // Route Variables passed by the router
+	Name       string              // The name associated with the route
+	Di         *di.Context         // Dependency injection context
+	Request    *http.Request       // Request data passed by the router
+	Response   http.ResponseWriter // Response Writer passed by the router
+	Parameters router.Parameter    // Route Variables passed by the router
+	Error      errors.Catcher      // Error errors reporters
 }
 
-func (cc *Context) ValidateRoute(c func(Validator.At)) Validator.Result {
-	return Validator.Run(Validator.NewRouterValueProvider(cc.Rv), c)
+func (cc *Context) ValidateRoute(c func(validator.At)) validator.Result {
+	return validator.Run(validator.NewRouterValueProvider(cc.Parameters), c)
 }
 
-func (cc *Context) ValidateGet(c func(Validator.At)) Validator.Result {
-	return Validator.Run(Validator.NewRequestValueProvider(cc.Request), c)
+func (cc *Context) ValidateGet(c func(validator.At)) validator.Result {
+	return validator.Run(validator.NewRequestValueProvider(cc.Request), c)
 }
 
-func (cc *Context) ValidatePost(c func(Validator.At)) Validator.Result {
-	cc.ParseForm()
-	return Validator.Run(Validator.NewURLValueProvider(cc.PostForm), c)
+func (cc *Context) ValidatePost(c func(validator.At)) validator.Result {
+	cc.Request.ParseForm()
+	return validator.Run(validator.NewURLValueProvider(cc.Request.PostForm), c)
 }
 
 func (cc *Context) DecodeJson(target interface{}) error {
-	return json.NewDecoder(cc.Body).Decode(target)
+	return json.NewDecoder(cc.Request.Body).Decode(target)
 }
 
 func (cc *Context) EncodeJson(from interface{}) error {
-	return json.NewEncoder(cc.Rw).Encode(from)
+	return json.NewEncoder(cc.Response).Encode(from)
 }
 
 func (cc *Context) WriteString(txt string) (int, error) {
-	return cc.Rw.Write([]byte(txt))
+	return cc.Response.Write([]byte(txt))
 }
 
 func (cc *Context) Redirect(urlStr string) {
@@ -51,24 +50,40 @@ func (cc *Context) Redirect(urlStr string) {
 }
 
 func (cc *Context) RedirectCode(urlStr string, code int) {
-	http.Redirect(cc.Rw, cc.Request, urlStr, code)
+	http.Redirect(cc.Response, cc.Request, urlStr, code)
 }
 
-var _New = sync.Pool{
+func (cc *Context) Get(name string) string {
+	return cc.Request.Form.Get(name)
+}
+
+func (cc *Context) Post(name string) string {
+	cc.Request.ParseForm()
+	return cc.Request.PostForm.Get(name)
+}
+
+func (cc *Context) Cookie(name string) (value string) {
+	if cookie, _ := cc.Request.Cookie(name); cookie != nil {
+		value = cookie.Value
+	}
+	return
+}
+
+var contextPool = sync.Pool{
 	New: func() interface{} {
 		return new(Context)
 	},
 }
 
 func New(c Context) (cc *Context) {
-	cc = _New.Get().(*Context)
+	cc = contextPool.Get().(*Context)
 	*cc = c
 	return
 }
 
 func (cc *Context) Done() {
 	// recycle cc
-	_New.Put(cc)
+	contextPool.Put(cc)
 	// recycle depedency injection table
 	cc.Di.Done()
 }

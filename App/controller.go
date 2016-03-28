@@ -1,9 +1,9 @@
-package App
+package app
 
 import (
-	"github.com/CloudyKit/framework/Common"
-	"github.com/CloudyKit/framework/Di"
-	"github.com/CloudyKit/framework/Request"
+	"github.com/CloudyKit/framework/common"
+	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/request"
 	"reflect"
 	"regexp"
 	"sync"
@@ -15,8 +15,8 @@ type (
 		typ  reflect.Type
 		pool *sync.Pool
 		app  *Application
-		Di   *Di.Context
-		*Request.Filters
+		Di   *di.Context
+		*request.Filters
 	}
 
 	invokeController struct {
@@ -54,10 +54,10 @@ func (app *Application) AddController(controllers ...Controller) {
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
-		newDi.Set((*Common.URLer)(nil), myGen)
+		newDi.Set((*common.URLer)(nil), myGen)
 
-		newFilter := new(Request.Filters)
-		newDi.Put(newFilter)
+		newFilter := new(request.Filters)
+		newDi.Map(newFilter)
 
 		controller.Mux(Mapper{
 			name:    name,
@@ -74,11 +74,15 @@ func (app *Application) AddController(controllers ...Controller) {
 	}
 }
 
-func (c *invokeController) Handle(rDi *Request.Context) {
+func (c *invokeController) Handle(rDi *request.Context) {
 
 	ii := c.pool.Get()
 	defer c.pool.Put(ii)
 	rDi.Di.Inject(ii)
+
+	if ii, isInitializer := ii.(interface{ Init() }); isInitializer {
+		ii.Init()
+	}
 
 	var arguments = [1]reflect.Value{reflect.ValueOf(ii)}
 	if c.isPtr == false {
@@ -86,11 +90,15 @@ func (c *invokeController) Handle(rDi *Request.Context) {
 	}
 
 	c.funcValue.Call(arguments[0:])
+
+	if ii, isFinalizer := ii.(interface{ Finalize() }); isFinalizer {
+		ii.Finalize()
+	}
 }
 
 var acRegex = regexp.MustCompile("[:*][^/]+")
 
-func (muxmap *Mapper) AddHandler(method, path, action string, filters ...Request.Filter) {
+func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.Channel)) {
 	methodByname, isPtr := muxmap.typ.MethodByName(action)
 	if !isPtr {
 		methodByname, _ = muxmap.typ.Elem().MethodByName(action)
@@ -98,7 +106,7 @@ func (muxmap *Mapper) AddHandler(method, path, action string, filters ...Request
 			panic("Inválid action " + action + " not found in controller " + muxmap.typ.String())
 		}
 	}
-	muxmap.app.urlGen[muxmap.typ.Elem().String()+"."+action] = acRegex.ReplaceAllLiteralString(path, "%v")
+	muxmap.app.urlGen[muxmap.typ.Elem().String() + "." + action] = acRegex.ReplaceAllLiteralString(path, "%v")
 	muxmap.app.AddHandlerContextName(muxmap.Di, muxmap.name, method, path, &invokeController{
 		pool:      muxmap.pool,
 		isPtr:     isPtr,

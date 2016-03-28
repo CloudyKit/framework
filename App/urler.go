@@ -1,15 +1,15 @@
-package App
+package app
 
 import (
 	"fmt"
-	"github.com/CloudyKit/framework/Common"
+	"github.com/CloudyKit/framework/common"
 )
 
 type urlGen map[string]string
 type ctlGen struct {
 	urlGen urlGen
 	id     string
-	Parent Common.URLer
+	Parent common.URLer
 }
 
 func (urler *ctlGen) URL(dst string, v ...interface{}) string {

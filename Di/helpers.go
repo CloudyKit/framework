@@ -1,4 +1,4 @@
-package Di
+package di
 
 import (
 	"io"

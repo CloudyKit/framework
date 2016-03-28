@@ -1,4 +1,4 @@
-package File
+package file
 
 import (
 	"io"
@@ -28,6 +28,11 @@ func (store Store) Writer(name string) (writer io.WriteCloser) {
 		panic(err)
 	}
 	return
+}
+
+func (store Store) Touch(name string) error {
+	now := time.Now()
+	return os.Chtimes(name, now, now)
 }
 
 func (store Store) Gc(before time.Time) {

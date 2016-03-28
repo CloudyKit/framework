@@ -1,11 +1,11 @@
-package View
+package view
 
 import (
 	"errors"
-	"github.com/CloudyKit/framework/App"
-	"github.com/CloudyKit/framework/Common"
-	"github.com/CloudyKit/framework/Di"
-	"github.com/CloudyKit/framework/Request"
+	"github.com/CloudyKit/framework/app"
+	"github.com/CloudyKit/framework/common"
+	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/request"
 	"io"
 	"reflect"
 	"sort"
@@ -19,25 +19,25 @@ var DefaultStdLoader = NewStdTemplateLoader("./views")
 
 func init() {
 
-	App.Default.Di.Put(DefaultManager)
+	app.Default.Di.Map(DefaultManager)
 
-	App.Default.Di.Set((*Context)(nil), func(c *Di.Context) interface{} {
+	app.Default.Di.Set((*Context)(nil), func(c *di.Context) interface{} {
 		tt := DefaultManager.NewContext(c)
-		c.Put(tt)
+		c.Map(tt)
 		return tt
 	})
 
-	Available(DefaultManager, (*Request.Context)(nil))
-	AvailableKey(DefaultManager, "linker", (*Common.URLer)(nil))
+	Available(DefaultManager, (*request.Context)(nil))
+	AvailableKey(DefaultManager, "linker", (*common.URLer)(nil))
 	DefaultManager.AddLoader(DefaultStdLoader, ".tpl", ".tpl.html")
 }
 
-func (m *Manager) NewContext(c *Di.Context) *Context {
+func (m *Manager) NewContext(c *di.Context) *Context {
 	tt := contextPool.Get().(*Context)
 
 	// init
 	tt.Manager = m
-	tt.Context = c.Get(tt.Context).(*Request.Context)
+	tt.Context = c.Get(tt.Context).(*request.Context)
 
 	// update auto variables
 	for i := 0; i < len(m.injectables); i++ {
@@ -57,7 +57,7 @@ var contextPool = sync.Pool{
 
 type Context struct {
 	Manager *Manager //Manager is
-	Context *Request.Context
+	Context *request.Context
 	Data    Data
 }
 
@@ -91,7 +91,7 @@ func (r Context) Renderer(v Renderer) error {
 }
 
 func (r Context) Render(view string, context Data) error {
-	return r.Manager.Render(r.Context.Rw, view, context)
+	return r.Manager.Render(r.Context.Response, view, context)
 }
 
 type ViewRenderer interface {
