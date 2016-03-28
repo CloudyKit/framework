@@ -19,7 +19,7 @@ var (
 
 	contextPool = sync.Pool{
 		New: func() interface{} {
-			return &Context{
+			return &Session{
 				data:make(sessionData),
 			}
 		},
@@ -41,29 +41,41 @@ func New(gcEvery time.Duration, duration time.Duration, store Store, serializer 
 	}
 }
 
-var _ = view.AvailableKey(view.DefaultManager, "Session", (*Context)(nil))
+var _ = view.AvailableKey(view.DefaultManager, "session", (*Session)(nil))
 
 type sessionData map[string]interface{}
 
-type Context struct {
+type Session struct {
 	id   string
 	data sessionData
 }
 
-func (c *Context) HasSession(key string) (isset bool) {
+func (c *Session) Id() string {
+	return c.id
+}
+
+func (c *Session) IsSet(key string) (isset bool) {
 	_, isset = c.data[key]
 	return
 }
-func (c *Context) Get(name string) (value interface{}) {
+func (c *Session) Get(name string) (value interface{}) {
 	value, _ = c.GetValue(name)
 	return
 }
 
-func (c *Context) GetValue(name string) (val interface{}, has bool) {
+func (c *Session) GetValue(name string) (val interface{}, has bool) {
 	val, has = c.data[name]
 	return
 }
 
-func (c *Context) Set(name string, val interface{}) {
+// Set sets a key in the session
+func (c *Session) Set(name string, val interface{}) {
 	c.data[name] = val
+}
+
+// Unset deletes a key in the session map
+func (c *Session) Unset(keys ...string) {
+	for i := 0; i < len(keys); i++ {
+		delete(c.data, keys[i])
+	}
 }

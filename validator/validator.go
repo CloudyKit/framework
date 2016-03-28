@@ -1,7 +1,7 @@
 package validator
 
 import (
-	"github.com/CloudyKit/Router"
+	"github.com/CloudyKit/router"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -22,7 +22,7 @@ func NewRequestValueProvider(vl *http.Request) Provider {
 	}
 }
 
-func NewRouterValueProvider(vl Router.Parameter) Provider {
+func NewRouterValueProvider(vl router.Parameter) Provider {
 	return func(name string) reflect.Value {
 		if vl.Index(name) == -1 {
 			return reflect.Value{}

@@ -1,7 +1,6 @@
 package app
 
 import (
-
 	"github.com/CloudyKit/framework/errors/reporters"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/framework/errors"
@@ -18,7 +17,7 @@ func New() *Application {
 
 	newApp := &Application{Di: di.New(), Router: router.New(), urlGen: make(urlGen), Filters: new(request.Filters)}
 
-	newApp.Error = reporters.LogReporter{}
+	newApp.Error.Reporter = reporters.LogReporter{}
 	// provide application urlGen as URLer
 	newApp.Di.Set((*common.URLer)(nil), newApp.urlGen)
 	// provide Filters plugins added in the application can setup filters
@@ -67,28 +66,24 @@ func (fn FuncHandler) Handle(c *request.Context) {
 	fn(c)
 }
 
-func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(request.Channel)) {
+func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(request.FContext)) {
 	add.AddHandler(method, path, fn, filters...)
 }
 
-func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(request.Channel)) {
+func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(request.FContext)) {
 	app.AddHandlerName("", method, path, handler, filters...)
 }
 
-func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(request.Channel)) {
+func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(request.FContext)) {
 	app.AddHandlerContextName(app.Di, name, method, path, handler, filters...)
 }
 
-func (app *Application) AddHandlerContextName(context *di.Context, name, method, path string, handler request.Handler, filters ...func(request.Channel)) {
+func (app *Application) AddHandlerContextName(context *di.Context, name, method, path string, handler request.Handler, filters ...func(request.FContext)) {
 	filters = app.MakeFilters(filters...)
 	app.Router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 		cc := request.New(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Di: context.Child()})
 		defer cc.Done() // call finalizers
 		cc.Di.Map(cc)   // self inject
-		(request.Channel{
-			Filters: filters,
-			Handler: handler,
-			Context: cc,
-		}).Next()
+		request.NewFContext(cc, handler, filters).Next()
 	})
 }

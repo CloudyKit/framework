@@ -67,12 +67,10 @@ func (sessionStore *Store) Reader(name string) (reader io.ReadCloser) {
 	return sessionStore.gridFs(name, false)
 }
 
-func (sessionStore *Store) Touch(name string) (err error) {
-	fs := sessionStore.gridFs(name, false)
-	if fs != nil {
-		fs.SetUploadDate(time.Now())
-	}
-	return
+func (sessionStore *Store) Remove(name string) (err error) {
+	sess := sessionStore.session()
+	defer sess.Close()
+	return sess.DB(sessionStore.db).GridFS(sessionStore.prefix).Remove(name)
 }
 
 func (sessionStore *Store) Gc(before time.Time) {

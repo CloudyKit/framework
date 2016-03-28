@@ -1,11 +1,11 @@
 package session
 
 import (
-	"encoding/gob"
-	"fmt"
 	"github.com/CloudyKit/framework/di"
+	"encoding/gob"
 	"reflect"
 	"sync"
+	"fmt"
 )
 
 var (
@@ -21,7 +21,7 @@ func persistPtr(typOf reflect.Type, diContext *di.Context, mapto string, i inter
 
 	sessionsTypes[typOf] = mapto
 	diContext.Set(i, func(c *di.Context) (ret interface{}) {
-		sess := c.Get((*Context)(nil)).(*Context)
+		sess := c.Get((*Session)(nil)).(*Session)
 		ret = sess.Get(mapto)
 		if ret == nil {
 			ret = reflect.New(structTyp).Interface()
@@ -34,7 +34,7 @@ func persistPtr(typOf reflect.Type, diContext *di.Context, mapto string, i inter
 
 func persistStruct(typOf reflect.Type, diContext *di.Context, mapto string, i interface{}) {
 	diContext.Set(i, func(c *di.Context, t reflect.Value) {
-		sess := c.Get((*Context)(nil)).(*Context)
+		sess := c.Get((*Session)(nil)).(*Session)
 		val := sess.Get(mapto)
 		if val != nil {
 			valueOf := reflect.ValueOf(val)

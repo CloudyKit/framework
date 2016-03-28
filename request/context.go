@@ -82,8 +82,6 @@ func New(c Context) (cc *Context) {
 }
 
 func (cc *Context) Done() {
-	// recycle cc
 	contextPool.Put(cc)
-	// recycle depedency injection table
 	cc.Di.Done()
 }

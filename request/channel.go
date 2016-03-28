@@ -1,22 +1,26 @@
 package request
 
 type Filters struct {
-	filters []func(Channel)
+	filters []func(FContext)
 }
 
-func (f *Filters) AddFilter(filters ...func(Channel)) {
+func (f *Filters) AddFilter(filters ...func(FContext)) {
 	f.filters = append(f.filters, filters...)
 }
-func (f *Filters) MakeFilters(filters ...func(Channel)) []func(Channel) {
-	newFilter := make([]func(Channel), 0, len(f.filters) + len(filters))
+func (f *Filters) MakeFilters(filters ...func(FContext)) []func(FContext) {
+	newFilter := make([]func(FContext), 0, len(f.filters) + len(filters))
 	newFilter = append(newFilter, f.filters...)
 	newFilter = append(newFilter, filters...)
 	return newFilter
 }
 
-type Channel struct {
+func NewFContext(r *Context, handler Handler, filters []func(FContext)) FContext {
+	return FContext{Context:r, Handler:handler, filters:filters}
+}
+
+type FContext struct {
 	*Context
-	Filters []func(Channel)
+	filters []func(FContext)
 	Handler Handler
 }
 
@@ -24,10 +28,10 @@ type Handler interface {
 	Handle(*Context)
 }
 
-func (c Channel) Next() {
-	if len(c.Filters) > 0 {
-		f := c.Filters[0]
-		c.Filters = c.Filters[1:]
+func (c FContext) Next() {
+	if len(c.filters) > 0 {
+		f := c.filters[0]
+		c.filters = c.filters[1:]
 		f(c)
 		return
 	}

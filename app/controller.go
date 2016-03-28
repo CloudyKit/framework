@@ -98,7 +98,7 @@ func (c *invokeController) Handle(rDi *request.Context) {
 
 var acRegex = regexp.MustCompile("[:*][^/]+")
 
-func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.Channel)) {
+func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.FContext)) {
 	methodByname, isPtr := muxmap.typ.MethodByName(action)
 	if !isPtr {
 		methodByname, _ = muxmap.typ.Elem().MethodByName(action)

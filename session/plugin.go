@@ -12,7 +12,7 @@ type Plugin struct {
 }
 
 func (sp *Plugin) Init(di *di.Context) {
-	println("Session plugin is initializing")
+
 	if sp.Manager == nil {
 		sp.Manager = di.Get(sp.Manager).(*Manager)
 	}
@@ -23,8 +23,8 @@ func (sp *Plugin) Init(di *di.Context) {
 
 	filters := di.Get((*request.Filters)(nil)).(*request.Filters)
 
-	filters.AddFilter(func(c request.Channel) {
-		sess := contextPool.Get().(*Context)
+	filters.AddFilter(func(c request.FContext) {
+		sess := contextPool.Get().(*Session)
 		c.Di.Map(sess)
 
 		if rCookie, _ := c.Request.Cookie(sp.CookieOptions.Name); rCookie == nil {
@@ -51,7 +51,7 @@ func (sp *Plugin) Init(di *di.Context) {
 	})
 }
 
-func finalize(m *Manager, sess *Context) {
+func finalize(m *Manager, sess *Session) {
 	m.Save(sess.id, sess.data)
 	for key := range sess.data {
 		delete(sess.data, key)

@@ -1,11 +1,11 @@
 package session
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"encoding/gob"
-	"io"
+	"crypto/rand"
 	"time"
+	"io"
 )
 
 
@@ -23,9 +23,7 @@ type Serializer interface {
 type Store interface {
 	Reader(name string) io.ReadCloser
 	Writer(name string) io.WriteCloser
-	Touch(name string)  error
-	//Rename(name string) error
-
+	Remove(name string) error
 	Gc(before time.Time)
 }
 

@@ -1,16 +1,16 @@
 package view
 
 import (
-	"errors"
-	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/common"
-	"github.com/CloudyKit/framework/di"
 	"github.com/CloudyKit/framework/request"
-	"io"
-	"reflect"
-	"sort"
+	"github.com/CloudyKit/framework/common"
+	"github.com/CloudyKit/framework/app"
+	"github.com/CloudyKit/framework/di"
 	"strings"
+	"reflect"
+	"errors"
+	"sort"
 	"sync"
+	"io"
 )
 
 var DefaultManager = &Manager{}

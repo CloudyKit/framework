@@ -65,6 +65,6 @@ func (session *Manager) Save(sessionName string, src interface{}) {
 	session.Serializer.Serialize(src, writer)
 }
 
-func (session *Manager) Touch(sessionName string) error {
-	return session.Store.Touch(sessionName)
+func (session *Manager) Unregister(sessionName string) error {
+	return session.Store.Remove(sessionName)
 }

@@ -1,11 +1,11 @@
 package view
 
 import (
-	"html/template"
-	"io"
-	"io/ioutil"
-	"path/filepath"
 	"text/template/parse"
+	"html/template"
+	"path/filepath"
+	"io/ioutil"
+	"io"
 )
 
 func NewStdTemplateLoader(base string) *StdTemplateLoader {

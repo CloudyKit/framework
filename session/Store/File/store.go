@@ -30,9 +30,8 @@ func (store Store) Writer(name string) (writer io.WriteCloser) {
 	return
 }
 
-func (store Store) Touch(name string) error {
-	now := time.Now()
-	return os.Chtimes(name, now, now)
+func (store Store) Remove(name string) error {
+	return os.Remove(path.Join(store.BaseDir, name))
 }
 
 func (store Store) Gc(before time.Time) {
