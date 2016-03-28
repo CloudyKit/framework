@@ -1,12 +1,12 @@
 package flash
 
 import (
-	"github.com/CloudyKit/framework/di"
+	"encoding/gob"
 	"errors"
 	"github.com/CloudyKit/framework/app"
+	"github.com/CloudyKit/framework/di"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/framework/view"
-	"encoding/gob"
 )
 
 func init() {
@@ -34,13 +34,12 @@ func (c *Flasher) Reflash(keys ...string) {
 	}
 }
 
-
 // Flash get or set flash message by key
 func (c *Flasher) Flash(key string, optvalue ...interface{}) (val interface{}) {
 	val, _ = c.readData[key]
 	if len(optvalue) == 1 {
 		c.Set(key, optvalue[0])
-	}else if len(optvalue) > 1 {
+	} else if len(optvalue) > 1 {
 		panic(errors.New("Inválid number of arguments in call to Context.Flash"))
 	}
 	return
@@ -82,10 +81,10 @@ func (plugin *flashPlugin) Init(di *di.Context) {
 		plugin.Store = store
 	}
 
-	plugin.Filters.AddFilter(func(c request.FContext) {
+	plugin.Filters.AddFilter(func(c request.ContextChain) {
 		readData, err := plugin.Read(c.Context)
 		c.Error.ReportIfNotNil(di, err)
-		cc := &Flasher{readData:readData}
+		cc := &Flasher{readData: readData}
 		di.Map(cc)
 		c.Next()
 		if cc.writeData != nil {

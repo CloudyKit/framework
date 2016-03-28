@@ -1,26 +1,26 @@
 package request
 
 type Filters struct {
-	filters []func(FContext)
+	filters []func(ContextChain)
 }
 
-func (f *Filters) AddFilter(filters ...func(FContext)) {
+func (f *Filters) AddFilter(filters ...func(ContextChain)) {
 	f.filters = append(f.filters, filters...)
 }
-func (f *Filters) MakeFilters(filters ...func(FContext)) []func(FContext) {
-	newFilter := make([]func(FContext), 0, len(f.filters) + len(filters))
+func (f *Filters) MakeFilters(filters ...func(ContextChain)) []func(ContextChain) {
+	newFilter := make([]func(ContextChain), 0, len(f.filters)+len(filters))
 	newFilter = append(newFilter, f.filters...)
 	newFilter = append(newFilter, filters...)
 	return newFilter
 }
 
-func NewFContext(r *Context, handler Handler, filters []func(FContext)) FContext {
-	return FContext{Context:r, Handler:handler, filters:filters}
+func NewContextChain(r *Context, handler Handler, filters []func(ContextChain)) ContextChain {
+	return ContextChain{Context: r, Handler: handler, filters: filters}
 }
 
-type FContext struct {
+type ContextChain struct {
 	*Context
-	filters []func(FContext)
+	filters []func(ContextChain)
 	Handler Handler
 }
 
@@ -28,7 +28,7 @@ type Handler interface {
 	Handle(*Context)
 }
 
-func (c FContext) Next() {
+func (c ContextChain) Next() {
 	if len(c.filters) > 0 {
 		f := c.filters[0]
 		c.filters = c.filters[1:]

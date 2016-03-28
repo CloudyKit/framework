@@ -1,16 +1,16 @@
 package session
 
 import (
-	"github.com/CloudyKit/framework/di"
 	"encoding/gob"
+	"fmt"
+	"github.com/CloudyKit/framework/di"
 	"reflect"
 	"sync"
-	"fmt"
 )
 
 var (
 	sessionsTypes = map[reflect.Type]string{}
-	rwMx = sync.Mutex{}
+	rwMx          = sync.Mutex{}
 )
 
 func persistPtr(typOf reflect.Type, diContext *di.Context, mapto string, i interface{}) {

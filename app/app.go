@@ -1,11 +1,11 @@
 package app
 
 import (
-	"github.com/CloudyKit/framework/errors/reporters"
-	"github.com/CloudyKit/framework/request"
-	"github.com/CloudyKit/framework/errors"
 	"github.com/CloudyKit/framework/common"
 	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/errors"
+	"github.com/CloudyKit/framework/errors/reporters"
+	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/router"
 
 	"net/http"
@@ -38,7 +38,7 @@ type Application struct {
 
 	urlGen urlGen
 	*request.Filters
-	Error  errors.Catcher
+	Error errors.Catcher
 }
 
 type Plugin interface {
@@ -66,24 +66,24 @@ func (fn FuncHandler) Handle(c *request.Context) {
 	fn(c)
 }
 
-func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(request.FContext)) {
+func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(request.ContextChain)) {
 	add.AddHandler(method, path, fn, filters...)
 }
 
-func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(request.FContext)) {
+func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
 	app.AddHandlerName("", method, path, handler, filters...)
 }
 
-func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(request.FContext)) {
+func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
 	app.AddHandlerContextName(app.Di, name, method, path, handler, filters...)
 }
 
-func (app *Application) AddHandlerContextName(context *di.Context, name, method, path string, handler request.Handler, filters ...func(request.FContext)) {
+func (app *Application) AddHandlerContextName(context *di.Context, name, method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
 	filters = app.MakeFilters(filters...)
 	app.Router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 		cc := request.New(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Di: context.Child()})
 		defer cc.Done() // call finalizers
 		cc.Di.Map(cc)   // self inject
-		request.NewFContext(cc, handler, filters).Next()
+		request.NewContextChain(cc, handler, filters).Next()
 	})
 }

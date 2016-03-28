@@ -6,13 +6,13 @@ import (
 )
 
 type CookieOptions struct {
-	Name     string
-	Path     string
-	Domain   string
+	Name   string
+	Path   string
+	Domain string
 
-	MaxAge   int
+	MaxAge int
 
-	Expires  time.Time
+	Expires time.Time
 
 	Secure   bool
 	HttpOnly bool
@@ -31,40 +31,54 @@ type Manager struct {
 // GCinvoke invokes garbage collection, will not update the timer
 // this method should be called only when explicit necessary otherwise you should call GCinvokeifnecessary
 // to only run gc periodically
-func (session *Manager) GCinvoke(now time.Time) {
-	session.Store.Gc(now.Add(-session.Duration))
+func (manager *Manager) GCinvoke(now time.Time) {
+	manager.Store.Gc(now.Add(-manager.Duration))
 }
 
 // GCinvokeifnecessary checks the last time the garbage collector ran and if necessary
 // runs the gc again and update the gcLastCall
-func (session *Manager) GCinvokeifnecessary() bool {
+func (manager *Manager) GCinvokeifnecessary(goroutine bool) bool {
 	now := time.Now()
-	session.lock.Lock()
-	invokeGc := session.gcLastCall.Add(session.gcEvery).Before(now)
+	manager.lock.Lock()
+	invokeGc := manager.gcLastCall.Add(manager.gcEvery).Before(now)
 	if invokeGc {
-		session.gcLastCall = now
-		session.lock.Unlock()
-		session.GCinvoke(now)
+		manager.gcLastCall = now
+		manager.lock.Unlock()
+		if goroutine {
+			go manager.GCinvoke(now)
+		} else {
+			manager.GCinvoke(now)
+		}
 	} else {
-		session.lock.Unlock()
+		manager.lock.Unlock()
 	}
 	return invokeGc
 }
 
 // Open opens a stored session and unserialize into dst
-func (session *Manager) Open(sessionName string, dst interface{}) {
-	reader := session.Store.Reader(sessionName)
-	defer reader.Close()
-	session.Serializer.Unserialize(dst, reader)
+func (manager *Manager) Open(sessionName string, dst interface{}) error {
+	reader, err := manager.Store.Reader(sessionName)
+	if err == nil && reader != nil {
+		err = manager.Serializer.Unserialize(dst, reader)
+		reader.Close()
+	} else if reader != nil {
+		reader.Close()
+	}
+	return err
 }
 
 // Save saves the session
-func (session *Manager) Save(sessionName string, src interface{}) {
-	writer := session.Store.Writer(sessionName)
-	defer writer.Close()
-	session.Serializer.Serialize(src, writer)
+func (manager *Manager) Save(sessionName string, src interface{}) error {
+	writer, err := manager.Store.Writer(sessionName)
+	if err == nil && writer != nil {
+		err = manager.Serializer.Serialize(src, writer)
+		writer.Close()
+	} else if writer != nil {
+		writer.Close()
+	}
+	return err
 }
 
-func (session *Manager) Unregister(sessionName string) error {
-	return session.Store.Remove(sessionName)
+func (manager *Manager) Unregister(sessionName string) error {
+	return manager.Store.Remove(sessionName)
 }

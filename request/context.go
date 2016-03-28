@@ -1,13 +1,14 @@
 package request
 
 import (
-	"github.com/CloudyKit/framework/validator"
-	"github.com/CloudyKit/framework/errors"
 	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/errors"
+	"github.com/CloudyKit/framework/validator"
 	"github.com/CloudyKit/router"
 
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"sync"
 )
 
@@ -33,11 +34,11 @@ func (cc *Context) ValidatePost(c func(validator.At)) validator.Result {
 	return validator.Run(validator.NewURLValueProvider(cc.Request.PostForm), c)
 }
 
-func (cc *Context) DecodeJson(target interface{}) error {
+func (cc *Context) JsonReadto(target interface{}) error {
 	return json.NewDecoder(cc.Request.Body).Decode(target)
 }
 
-func (cc *Context) EncodeJson(from interface{}) error {
+func (cc *Context) JsonWritefrom(from interface{}) error {
 	return json.NewEncoder(cc.Response).Encode(from)
 }
 
@@ -64,7 +65,9 @@ func (cc *Context) Post(name string) string {
 
 func (cc *Context) Cookie(name string) (value string) {
 	if cookie, _ := cc.Request.Cookie(name); cookie != nil {
-		value = cookie.Value
+		var err error
+		value, err = url.QueryUnescape(cookie.Value)
+		cc.Error.ReportIfNotNil(cc.Di, err)
 	}
 	return
 }

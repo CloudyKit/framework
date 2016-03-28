@@ -23,7 +23,7 @@ func (sp *Plugin) Init(di *di.Context) {
 
 	filters := di.Get((*request.Filters)(nil)).(*request.Filters)
 
-	filters.AddFilter(func(c request.FContext) {
+	filters.AddFilter(func(c request.ContextChain) {
 		sess := contextPool.Get().(*Session)
 		c.Di.Map(sess)
 
@@ -31,7 +31,7 @@ func (sp *Plugin) Init(di *di.Context) {
 			sess.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
 			sess.id = sp.Manager.Generator.Generate(rCookie.Value, sp.CookieOptions.Name)
-			sp.Manager.Open(rCookie.Value, &sess.data)
+			c.Error.ReportIfNotNil(c.Di, sp.Manager.Open(rCookie.Value, &sess.Data))
 		}
 		// sets the cookie
 		http.SetCookie(c.Response, &http.Cookie{
@@ -46,15 +46,11 @@ func (sp *Plugin) Init(di *di.Context) {
 		})
 
 		c.Next()
-		finalize(sp.Manager, sess)
+		c.Error.ReportIfNotNil(sp.Manager.Save(sess.id, sess.Data))
+		for key := range sess.Data {
+			delete(sess.Data, key)
+		}
+		sp.Manager.GCinvokeifnecessary(true)
 		contextPool.Put(sess)
 	})
-}
-
-func finalize(m *Manager, sess *Session) {
-	m.Save(sess.id, sess.data)
-	for key := range sess.data {
-		delete(sess.data, key)
-	}
-	go m.GCinvokeifnecessary()
 }

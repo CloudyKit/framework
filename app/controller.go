@@ -80,7 +80,9 @@ func (c *invokeController) Handle(rDi *request.Context) {
 	defer c.pool.Put(ii)
 	rDi.Di.Inject(ii)
 
-	if ii, isInitializer := ii.(interface{ Init() }); isInitializer {
+	if ii, isInitializer := ii.(interface {
+		Init()
+	}); isInitializer {
 		ii.Init()
 	}
 
@@ -91,14 +93,16 @@ func (c *invokeController) Handle(rDi *request.Context) {
 
 	c.funcValue.Call(arguments[0:])
 
-	if ii, isFinalizer := ii.(interface{ Finalize() }); isFinalizer {
+	if ii, isFinalizer := ii.(interface {
+		Finalize()
+	}); isFinalizer {
 		ii.Finalize()
 	}
 }
 
 var acRegex = regexp.MustCompile("[:*][^/]+")
 
-func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.FContext)) {
+func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.ContextChain)) {
 	methodByname, isPtr := muxmap.typ.MethodByName(action)
 	if !isPtr {
 		methodByname, _ = muxmap.typ.Elem().MethodByName(action)
@@ -106,7 +110,7 @@ func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(re
 			panic("Inválid action " + action + " not found in controller " + muxmap.typ.String())
 		}
 	}
-	muxmap.app.urlGen[muxmap.typ.Elem().String() + "." + action] = acRegex.ReplaceAllLiteralString(path, "%v")
+	muxmap.app.urlGen[muxmap.typ.Elem().String()+"."+action] = acRegex.ReplaceAllLiteralString(path, "%v")
 	muxmap.app.AddHandlerContextName(muxmap.Di, muxmap.name, method, path, &invokeController{
 		pool:      muxmap.pool,
 		isPtr:     isPtr,

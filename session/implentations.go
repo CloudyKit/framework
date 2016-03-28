@@ -1,14 +1,12 @@
 package session
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/gob"
-	"crypto/rand"
-	"time"
 	"io"
+	"time"
 )
-
-
 
 // IdGenerator this interface represents an id generator
 type IdGenerator interface {
@@ -16,13 +14,13 @@ type IdGenerator interface {
 }
 
 type Serializer interface {
-	Serialize(src interface{}, w io.Writer)
-	Unserialize(dst interface{}, r io.Reader)
+	Serialize(src interface{}, w io.Writer) error
+	Unserialize(dst interface{}, r io.Reader) error
 }
 
 type Store interface {
-	Reader(name string) io.ReadCloser
-	Writer(name string) io.WriteCloser
+	Reader(name string) (io.ReadCloser, error)
+	Writer(name string) (io.WriteCloser, error)
 	Remove(name string) error
 	Gc(before time.Time)
 }
@@ -42,17 +40,10 @@ func (RandGenerator) Generate(id, name string) string {
 	return id
 }
 
-func (serializer GobSerializer) Unserialize(dst interface{}, reader io.Reader) {
-	err := gob.NewDecoder(reader).Decode(dst)
-	if err != nil {
-		panic(err)
-	}
-
+func (serializer GobSerializer) Unserialize(dst interface{}, reader io.Reader) error {
+	return gob.NewDecoder(reader).Decode(dst)
 }
 
-func (serializer GobSerializer) Serialize(src interface{}, writer io.Writer) {
-	err := gob.NewEncoder(writer).Encode(src)
-	if err != nil {
-		panic(err)
-	}
+func (serializer GobSerializer) Serialize(src interface{}, writer io.Writer) error {
+	return gob.NewEncoder(writer).Encode(src)
 }

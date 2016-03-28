@@ -1,9 +1,9 @@
 package flash
 
 import (
+	"errors"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/framework/session"
-	"errors"
 )
 
 const defaultKey = "###flash-variables###"

@@ -1,9 +1,9 @@
 package view
 
 import (
+	"fmt"
 	"github.com/CloudyKit/framework/common"
 	"reflect"
-	"fmt"
 )
 
 func defaultName(typ reflect.Type) string {

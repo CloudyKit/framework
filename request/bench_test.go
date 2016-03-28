@@ -12,7 +12,7 @@ type BenchController struct {
 	*testing.B
 }
 
-func invokeNextMiddleware(rf FContext) {
+func invokeNextMiddleware(rf ContextChain) {
 	rf.Next()
 }
 

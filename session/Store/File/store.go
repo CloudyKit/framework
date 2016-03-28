@@ -12,21 +12,16 @@ type Store struct {
 	BaseDir string
 }
 
-func (store Store) Reader(name string) (reader io.ReadCloser) {
-	var err error
+func (store Store) Reader(name string) (reader io.ReadCloser, err error) {
 	reader, err = os.Open(path.Join(store.BaseDir, name))
 	if err != nil && os.IsNotExist(err) {
-		panic(err)
+		err = nil
 	}
 	return
 }
 
-func (store Store) Writer(name string) (writer io.WriteCloser) {
-	var err error
+func (store Store) Writer(name string) (writer io.WriteCloser, err error) {
 	writer, err = os.Create(path.Join(store.BaseDir, name))
-	if err != nil {
-		panic(err)
-	}
 	return
 }
 

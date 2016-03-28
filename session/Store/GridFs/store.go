@@ -40,31 +40,27 @@ type Store struct {
 	db, prefix string
 }
 
-func (sessionStore *Store) gridFs(name string, create bool) *sessionCloser {
+func (sessionStore *Store) gridFs(name string, create bool) (*sessionCloser, error) {
 	session := sessionStore.session()
 	session.SetMode(mgo.Strong, false)
 	gridFs := session.DB(sessionStore.db).GridFS(sessionStore.prefix)
 	if create {
 		gridFs.Remove(name)
 		gridFile, err := gridFs.Create(name)
-		if err != nil {
-			panic(err)
-		}
-		return &sessionCloser{session: session, GridFile: gridFile}
+		return &sessionCloser{session: session, GridFile: gridFile}, err
 	}
 	gridFile, err := gridFs.Open(name)
-	if err != nil {
-		panic(err)
-	}
-	return &sessionCloser{session: session, GridFile: gridFile}
+	return &sessionCloser{session: session, GridFile: gridFile}, err
 }
 
-func (sessionStore *Store) Writer(name string) (writer io.WriteCloser) {
-	return sessionStore.gridFs(name, true)
+func (sessionStore *Store) Writer(name string) (writer io.WriteCloser, err error) {
+	writer, err = sessionStore.gridFs(name, true)
+	return
 }
 
-func (sessionStore *Store) Reader(name string) (reader io.ReadCloser) {
-	return sessionStore.gridFs(name, false)
+func (sessionStore *Store) Reader(name string) (reader io.ReadCloser, err error) {
+	reader, err = sessionStore.gridFs(name, false)
+	return
 }
 
 func (sessionStore *Store) Remove(name string) (err error) {
