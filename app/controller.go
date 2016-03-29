@@ -2,7 +2,7 @@ package app
 
 import (
 	"github.com/CloudyKit/framework/common"
-	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
 	"reflect"
 	"regexp"
@@ -15,7 +15,7 @@ type (
 		typ  reflect.Type
 		pool *sync.Pool
 		app  *Application
-		Di   *di.Context
+		Di   *context.Context
 		*request.Filters
 	}
 
@@ -54,7 +54,7 @@ func (app *Application) AddController(controllers ...Controller) {
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
-		newDi.Set((*common.URLer)(nil), myGen)
+		newDi.MapType((*common.URLer)(nil), myGen)
 
 		newFilter := new(request.Filters)
 		newDi.Map(newFilter)

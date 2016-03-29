@@ -3,7 +3,7 @@ package session
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/context"
 	"reflect"
 	"sync"
 )
@@ -13,14 +13,14 @@ var (
 	rwMx          = sync.Mutex{}
 )
 
-func persistPtr(typOf reflect.Type, diContext *di.Context, mapto string, i interface{}) {
+func persistPtr(typOf reflect.Type, diContext *context.Context, mapto string, i interface{}) {
 	structTyp := typOf.Elem()
 	if structTyp.Kind() != reflect.Struct {
 		panic(fmt.Errorf("Type %q is not a pointer to struct", typOf))
 	}
 
 	sessionsTypes[typOf] = mapto
-	diContext.Set(i, func(c *di.Context) (ret interface{}) {
+	diContext.MapType(i, func(c *context.Context) (ret interface{}) {
 		sess := c.Get((*Session)(nil)).(*Session)
 		ret = sess.Get(mapto)
 		if ret == nil {
@@ -32,8 +32,8 @@ func persistPtr(typOf reflect.Type, diContext *di.Context, mapto string, i inter
 	})
 }
 
-func persistStruct(typOf reflect.Type, diContext *di.Context, mapto string, i interface{}) {
-	diContext.Set(i, func(c *di.Context, t reflect.Value) {
+func persistStruct(typOf reflect.Type, diContext *context.Context, mapto string, i interface{}) {
+	diContext.MapType(i, func(c *context.Context, t reflect.Value) {
 		sess := c.Get((*Session)(nil)).(*Session)
 		val := sess.Get(mapto)
 		if val != nil {
@@ -47,11 +47,11 @@ func persistStruct(typOf reflect.Type, diContext *di.Context, mapto string, i in
 	})
 }
 
-func Persist(diContext *di.Context, i interface{}) error {
+func Persist(diContext *context.Context, i interface{}) error {
 	return PersistKey(diContext, "", i)
 }
 
-func PersistKey(diContext *di.Context, key string, i interface{}) error {
+func PersistKey(diContext *context.Context, key string, i interface{}) error {
 	rwMx.Lock()
 	defer rwMx.Unlock()
 	typOf := reflect.TypeOf(i)

@@ -1,4 +1,4 @@
-package di
+package context
 
 import (
 	"testing"

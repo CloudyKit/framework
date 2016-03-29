@@ -1,7 +1,7 @@
 package session
 
 import (
-	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
 	"net/http"
 )
@@ -11,7 +11,7 @@ type Plugin struct {
 	Manager       *Manager
 }
 
-func (sp *Plugin) Init(di *di.Context) {
+func (sp *Plugin) Init(di *context.Context) {
 
 	if sp.Manager == nil {
 		sp.Manager = di.Get(sp.Manager).(*Manager)
@@ -31,7 +31,7 @@ func (sp *Plugin) Init(di *di.Context) {
 			sess.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
 			sess.id = sp.Manager.Generator.Generate(rCookie.Value, sp.CookieOptions.Name)
-			c.Error.ReportIfNotNil(c.Di, sp.Manager.Open(rCookie.Value, &sess.Data))
+			c.Notifier.NotifyIfNotNil(sp.Manager.Open(rCookie.Value, &sess.Data))
 		}
 		// sets the cookie
 		http.SetCookie(c.Response, &http.Cookie{
@@ -46,7 +46,7 @@ func (sp *Plugin) Init(di *di.Context) {
 		})
 
 		c.Next()
-		c.Error.ReportIfNotNil(c.Di, sp.Manager.Save(sess.id, sess.Data))
+		c.Notifier.NotifyIfNotNil(sp.Manager.Save(sess.id, sess.Data))
 		for key := range sess.Data {
 			delete(sess.Data, key)
 		}

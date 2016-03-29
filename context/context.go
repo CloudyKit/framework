@@ -1,4 +1,4 @@
-package di
+package context
 
 import (
 	"fmt"
@@ -77,27 +77,31 @@ func (c *Context) Inject(target interface{}) {
 		panic("Invalid value passed to inject, required kind is struct get " + value.Kind().String())
 	}
 
-	c.injectfields(value)
+	c.InjectStructValue(value)
 }
 
 // injectfields walks the struct value looking to injectable fields
-func (c *Context) injectfields(value reflect.Value) {
+func (c *Context) InjectStructValue(value reflect.Value) {
 	numFields := value.NumField()
 	for i := 0; i < numFields; i++ {
 		field := value.Field(i)
 		fieldTyp := field.Type()
-		if provided_value := c.val4TypeField(fieldTyp, field); provided_value != nil {
-			field.Set(reflect.ValueOf(provided_value))
-		} else {
-			if _, ok := walkableFields[fieldTyp]; ok {
-				c.injectfields(field)
+
+		if provided_value, wasSetted := c.val4TypeField(fieldTyp, field); provided_value != nil || wasSetted {
+			if !wasSetted {
+				field.Set(reflect.ValueOf(provided_value))
 			}
+			continue
+		}
+
+		if _, ok := walkableFields[fieldTyp]; ok {
+			c.InjectStructValue(field)
 		}
 	}
 }
 
 // Set sets a provider for the type of typ with value of val
-func (c *Context) Set(typ, val interface{}) {
+func (c *Context) MapType(typ, val interface{}) {
 	typOf := reflect.TypeOf(typ)
 	if typOf.Kind() == reflect.Ptr && typOf.Elem().Kind() == reflect.Interface {
 		typOf = typOf.Elem()
@@ -165,19 +169,19 @@ func (_context *Context) val4type(typ reflect.Type) (val interface{}) {
 }
 
 // val4TypeField returns a value for the specified type typ
-func (c *Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}) {
+func (c *Context) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}, ok bool) {
 	val = c.val4type(typ)
 	switch provider := val.(type) {
 	case func(*Context) interface{}:
 		val = provider(c)
 	case func(*Context, reflect.Value):
 		provider(c, valOf)
-		val = nil
+		ok = true
 	case provider:
 		val = provider.Provide(c)
 	case providerSetter:
 		provider.Provide(c, valOf)
-		val = nil
+		ok = true
 	}
 	return
 }

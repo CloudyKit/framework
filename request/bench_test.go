@@ -52,7 +52,7 @@ func BenchmarkFlowRequest(b *testing.B) {
 	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/", nil)
 	for i := 0; i < b.N; i++ {
-		benchApp.Router.ServeHTTP(nil, request)
+		benchApp.router.ServeHTTP(nil, request)
 	}
 }
 
@@ -60,7 +60,7 @@ func BenchmarkFlowRequestMiddleware1(b *testing.B) {
 	request, _ := http.NewRequest("GET", "/middlewares/1", nil)
 	benchApp.Di.Map(b)
 	for i := 0; i < b.N; i++ {
-		benchApp.Router.ServeHTTP(nil, request)
+		benchApp.router.ServeHTTP(nil, request)
 	}
 }
 
@@ -68,13 +68,13 @@ func BenchmarkFlowRequestMiddleware4(b *testing.B) {
 	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/4", nil)
 	for i := 0; i < b.N; i++ {
-		benchApp.Router.ServeHTTP(nil, request)
+		benchApp.router.ServeHTTP(nil, request)
 	}
 }
 func BenchmarkFlowRequestMiddleware24(b *testing.B) {
 	benchApp.Di.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/24", nil)
 	for i := 0; i < b.N; i++ {
-		benchApp.Router.ServeHTTP(nil, request)
+		benchApp.router.ServeHTTP(nil, request)
 	}
 }

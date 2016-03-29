@@ -4,7 +4,7 @@ import (
 	"errors"
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/common"
-	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
 	"io"
 	"reflect"
@@ -21,7 +21,7 @@ func init() {
 
 	app.Default.Di.Map(DefaultManager)
 
-	app.Default.Di.Set((*Context)(nil), func(c *di.Context) interface{} {
+	app.Default.Di.MapType((*Context)(nil), func(c *context.Context) interface{} {
 		tt := DefaultManager.NewContext(c)
 		c.Map(tt)
 		return tt
@@ -32,7 +32,7 @@ func init() {
 	DefaultManager.AddLoader(DefaultStdLoader, ".tpl", ".tpl.html")
 }
 
-func (m *Manager) NewContext(c *di.Context) *Context {
+func (m *Manager) NewContext(c *context.Context) *Context {
 	tt := contextPool.Get().(*Context)
 
 	// init

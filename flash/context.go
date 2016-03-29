@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/di"
+	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/framework/view"
 )
@@ -73,7 +73,7 @@ type flashPlugin struct {
 	Filters *request.Filters
 }
 
-func (plugin *flashPlugin) Init(di *di.Context) {
+func (plugin *flashPlugin) Init(di *context.Context) {
 	store := plugin.Store
 	di.Inject(plugin)
 
@@ -83,12 +83,12 @@ func (plugin *flashPlugin) Init(di *di.Context) {
 
 	plugin.Filters.AddFilter(func(c request.ContextChain) {
 		readData, err := plugin.Read(c.Context)
-		c.Error.ReportIfNotNil(di, err)
+		c.Notifier.NotifyIfNotNil(err)
 		cc := &Flasher{readData: readData}
 		di.Map(cc)
 		c.Next()
 		if cc.writeData != nil {
-			c.Error.ReportIfNotNil(di, plugin.Save(c.Context, cc.writeData))
+			c.Notifier.NotifyIfNotNil(plugin.Save(c.Context, cc.writeData))
 		}
 	})
 
