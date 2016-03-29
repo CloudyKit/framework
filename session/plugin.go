@@ -46,7 +46,7 @@ func (sp *Plugin) Init(di *di.Context) {
 		})
 
 		c.Next()
-		c.Error.ReportIfNotNil(sp.Manager.Save(sess.id, sess.Data))
+		c.Error.ReportIfNotNil(c.Di, sp.Manager.Save(sess.id, sess.Data))
 		for key := range sess.Data {
 			delete(sess.Data, key)
 		}
