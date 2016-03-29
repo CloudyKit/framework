@@ -9,6 +9,10 @@ import (
 type LogReporter struct{}
 
 func (logReporter LogReporter) Report(di *context.Context, err error) {
-	c := di.Get((*request.Context)(nil)).(*request.Context)
-	log.Println(c.Name, err.Error())
+	c, _ := di.Get((*request.Context)(nil)).(*request.Context)
+	if c != nil {
+		log.Println(c.Name, err.Error())
+	} else {
+		log.Println(err.Error())
+	}
 }

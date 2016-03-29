@@ -31,7 +31,7 @@ func (sp *Plugin) Init(di *context.Context) {
 			sess.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
 			sess.id = sp.Manager.Generator.Generate(rCookie.Value, sp.CookieOptions.Name)
-			c.Notifier.NotifyIfNotNil(sp.Manager.Open(rCookie.Value, &sess.Data))
+			c.Notifier.NotifyIfNotNil(sp.Manager.Open(c.Di, rCookie.Value, &sess.Data))
 		}
 		// sets the cookie
 		http.SetCookie(c.Response, &http.Cookie{
@@ -46,11 +46,11 @@ func (sp *Plugin) Init(di *context.Context) {
 		})
 
 		c.Next()
-		c.Notifier.NotifyIfNotNil(sp.Manager.Save(sess.id, sess.Data))
+		c.Notifier.NotifyIfNotNil(sp.Manager.Save(c.Di, sess.id, sess.Data))
 		for key := range sess.Data {
 			delete(sess.Data, key)
 		}
-		sp.Manager.GCinvokeifnecessary(true)
+		sp.Manager.GCinvokeifnecessary(c.Di, true)
 		contextPool.Put(sess)
 	})
 }

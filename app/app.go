@@ -20,7 +20,7 @@ func New() *Application {
 	newApp := &Application{Di: context.New(), router: router.New(), urlGen: make(urlGen), Filters: new(request.Filters)}
 
 	// setups default err reporter
-	newApp.Notifier = errors.NewCatcher(newApp.Di, reporters.LogReporter{})
+	newApp.Notifier = errors.NewNotifier(newApp.Di, reporters.LogReporter{})
 	// provide application urlGen as URLer
 	newApp.Di.MapType((*common.URLer)(nil), newApp.urlGen)
 	// provide Filters plugins added in the application can setup filters
@@ -84,8 +84,9 @@ func (app *Application) AddHandlerContextName(context *context.Context, name, me
 	filters = app.MakeFilters(filters...)
 	app.router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 		cc := request.New(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Di: context.Child()})
-		defer cc.Done() // call finalizers
-		cc.Di.Map(cc)   // self inject
+		defer cc.Di.Done() // call finalizers
+		cc.Di.Map(cc)      // self inject
+		cc.Notifier = cc.Di.Get(cc.Notifier).(errors.Notifier)
 		request.NewContextChain(cc, handler, filters).Next()
 	})
 }

@@ -13,12 +13,12 @@ type Notifier struct {
 	reporter Reporter
 }
 
-func NewCatcher(di *context.Context, reporter Reporter) Notifier {
+func NewNotifier(di *context.Context, reporter Reporter) Notifier {
 	return Notifier{di: di, reporter: reporter}
 }
 
-func (notifier *Notifier) Provide(di *context.Context) interface{} {
-	return NewCatcher(di, notifier.reporter)
+func (notifier Notifier) Provide(di *context.Context) interface{} {
+	return NewNotifier(di, notifier.reporter)
 }
 
 func (notifier Notifier) NotifyPanic() {

@@ -84,7 +84,6 @@ func New(c Context) (cc *Context) {
 	return
 }
 
-func (cc *Context) Done() {
+func (cc *Context) Finalize() {
 	contextPool.Put(cc)
-	cc.Di.Done()
 }
