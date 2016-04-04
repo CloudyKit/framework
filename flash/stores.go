@@ -32,7 +32,7 @@ func (sess Session) Read(r *request.Context) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if ii, has := sessContext.GetValue(sess.getKey()); has {
+	if ii, has := sessContext.Lookup(sess.getKey()); has {
 		sessContext.Unset(sess.getKey())
 		return ii.(map[string]interface{}), nil
 	}

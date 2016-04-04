@@ -2,7 +2,6 @@ package flash
 
 import (
 	"encoding/gob"
-	"errors"
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
@@ -14,7 +13,7 @@ func init() {
 	app.Default.AddPlugin(NewPlugin(Session{defaultKey}))
 }
 
-var _ = view.AvailableKey(view.DefaultManager, "flasher", &Flasher{})
+var _ = view.AvailableKey(view.DefaultManager, "flashes", &Flasher{})
 
 type Store interface {
 	Read(*request.Context) (map[string]interface{}, error)
@@ -23,35 +22,28 @@ type Store interface {
 
 type Flasher struct {
 	writeData map[string]interface{}
-	readData  map[string]interface{}
+	Data      map[string]interface{}
 }
 
 func (c *Flasher) Reflash(keys ...string) {
 	for i := 0; i < len(keys); i++ {
-		if val, has := c.readData[keys[i]]; has {
+		if val, has := c.Data[keys[i]]; has {
 			c.writeData[keys[i]] = val
 		}
 	}
 }
 
-// Flash get or set flash message by key
-func (c *Flasher) Flash(key string, optvalue ...interface{}) (val interface{}) {
-	val, _ = c.readData[key]
-	if len(optvalue) == 1 {
-		c.Set(key, optvalue[0])
-	} else if len(optvalue) > 1 {
-		panic(errors.New("Inválid number of arguments in call to Context.Flash"))
-	}
-	return
+func (c *Flasher) Get(key string) interface{} {
+	return c.Data[key]
 }
 
-func (c *Flasher) IsSet(key string) (isset bool) {
-	_, isset = c.readData[key]
+func (c *Flasher) Contains(key string) (isset bool) {
+	_, isset = c.Data[key]
 	return
 }
 
 func (c *Flasher) Lookup(key string) (val interface{}, has bool) {
-	val, has = c.readData[key]
+	val, has = c.Data[key]
 	return
 }
 
@@ -84,7 +76,7 @@ func (plugin *flashPlugin) Init(di *context.Context) {
 	plugin.Filters.AddFilter(func(c request.ContextChain) {
 		readData, err := plugin.Read(c.Context)
 		c.Notifier.NotifyIfNotNil(err)
-		cc := &Flasher{readData: readData}
+		cc := &Flasher{Data: readData}
 		di.Map(cc)
 		c.Next()
 		if cc.writeData != nil {

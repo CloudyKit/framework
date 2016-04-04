@@ -1,17 +1,16 @@
 package session
 
 import (
-	"github.com/CloudyKit/framework/session/store/file"
-
 	"encoding/gob"
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/view"
 	"sync"
 	"time"
+	"github.com/CloudyKit/framework/session/store/mem"
 )
 
 var (
-	DefaultManager = New(time.Hour, time.Hour*2, file.Store{"./sessions"}, GobSerializer{}, RandGenerator{})
+	DefaultManager = New(time.Hour, time.Hour * 2, mem.New(), GobSerializer{}, RandGenerator{})
 
 	DefaultCookieOptions = &CookieOptions{
 		Name: "__gsid",
@@ -54,16 +53,16 @@ func (c *Session) Id() string {
 	return c.id
 }
 
-func (c *Session) IsSet(key string) (isset bool) {
-	_, isset = c.Data[key]
+func (c *Session) Contains(key string) (contains bool) {
+	_, contains = c.Data[key]
 	return
 }
 func (c *Session) Get(name string) (value interface{}) {
-	value, _ = c.GetValue(name)
+	value, _ = c.Data[name]
 	return
 }
 
-func (c *Session) GetValue(name string) (val interface{}, has bool) {
+func (c *Session) Lookup(name string) (val interface{}, has bool) {
 	val, has = c.Data[name]
 	return
 }
