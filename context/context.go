@@ -226,12 +226,11 @@ func (c *Context) finalize() {
 	//runs recycle here
 	for _typ, _val := range c.values {
 		// not delete the keys
-		c.values[_typ] = nil
+		delete(c.values, _typ)
 		if _finalizer, isFinalizer := _val.(finalizer); isFinalizer {
 			_finalizer.Finalize()
 		}
 	}
-
 	c.references = 0
 	c.parent = nil
 	pool.Put(c)

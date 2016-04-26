@@ -74,13 +74,13 @@ func (plugin *flashPlugin) Init(di *context.Context) {
 	}
 
 	plugin.Filters.AddFilter(func(c request.ContextChain) {
-		readData, err := plugin.Read(c.Context)
-		c.Notifier.NotifyIfNotNil(err)
+		readData, err := plugin.Read(c.Request)
+		c.Notifier.ErrNotify(err)
 		cc := &Flasher{Data: readData}
 		di.Map(cc)
 		c.Next()
 		if cc.writeData != nil {
-			c.Notifier.NotifyIfNotNil(plugin.Save(c.Context, cc.writeData))
+			c.Notifier.ErrNotify(plugin.Save(c.Request, cc.writeData))
 		}
 	})
 

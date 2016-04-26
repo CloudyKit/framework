@@ -15,11 +15,11 @@ func (f *Filters) MakeFilters(filters ...func(ContextChain)) []func(ContextChain
 }
 
 func NewContextChain(r *Context, handler Handler, filters []func(ContextChain)) ContextChain {
-	return ContextChain{Context: r, Handler: handler, filters: filters}
+	return ContextChain{Request: r, Handler: handler, filters: filters}
 }
 
 type ContextChain struct {
-	*Context
+	Request *Context
 	filters []func(ContextChain)
 	Handler Handler
 }
@@ -35,5 +35,5 @@ func (c ContextChain) Next() {
 		f(c)
 		return
 	}
-	c.Handler.Handle(c.Context)
+	c.Handler.Handle(c.Request)
 }

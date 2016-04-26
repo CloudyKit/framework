@@ -3,14 +3,13 @@ package session
 import (
 	"encoding/gob"
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/view"
+	"github.com/CloudyKit/framework/session/store/file"
 	"sync"
 	"time"
-	"github.com/CloudyKit/framework/session/store/mem"
 )
 
 var (
-	DefaultManager = New(time.Hour, time.Hour * 2, mem.New(), GobSerializer{}, RandGenerator{})
+	DefaultManager = New(time.Hour, time.Hour*2, file.New("./sessions"), GobSerializer{}, RandGenerator{})
 
 	DefaultCookieOptions = &CookieOptions{
 		Name: "__gsid",
@@ -18,9 +17,7 @@ var (
 
 	contextPool = sync.Pool{
 		New: func() interface{} {
-			return &Session{
-				Data: make(sessionData),
-			}
+			return &Session{}
 		},
 	}
 )
@@ -39,8 +36,6 @@ func New(gcEvery time.Duration, duration time.Duration, store Store, serializer 
 		Serializer: serializer,
 	}
 }
-
-var _ = view.AvailableKey(view.DefaultManager, "session", (*Session)(nil))
 
 type sessionData map[string]interface{}
 

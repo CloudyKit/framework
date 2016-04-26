@@ -25,16 +25,18 @@ func (sp *Plugin) Init(di *context.Context) {
 
 	filters.AddFilter(func(c request.ContextChain) {
 		sess := contextPool.Get().(*Session)
-		c.Di.Map(sess)
+		sess.Data = make(sessionData)
 
-		if rCookie, _ := c.Request.Cookie(sp.CookieOptions.Name); rCookie == nil {
+		c.Request.Context.Map(sess)
+
+		if rCookie, _ := c.Request.Request.Cookie(sp.CookieOptions.Name); rCookie == nil {
 			sess.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
 			sess.id = sp.Manager.Generator.Generate(rCookie.Value, sp.CookieOptions.Name)
-			c.Notifier.NotifyIfNotNil(sp.Manager.Open(c.Di, rCookie.Value, &sess.Data))
+			c.Request.Notifier.ErrNotify(sp.Manager.Open(c.Request.Context, rCookie.Value, &sess.Data))
 		}
 		// sets the cookie
-		http.SetCookie(c.Response, &http.Cookie{
+		http.SetCookie(c.Request.Response, &http.Cookie{
 			Name:     sp.CookieOptions.Name,
 			Value:    sess.id,
 			Path:     sp.CookieOptions.Path,
@@ -46,11 +48,11 @@ func (sp *Plugin) Init(di *context.Context) {
 		})
 
 		c.Next()
-		c.Notifier.NotifyIfNotNil(sp.Manager.Save(c.Di, sess.id, sess.Data))
-		for key := range sess.Data {
-			delete(sess.Data, key)
-		}
-		sp.Manager.GCinvokeifnecessary(c.Di, true)
+
+		c.Request.Notifier.ErrNotify(sp.Manager.Save(c.Request.Context, sess.id, sess.Data))
+		sess.Data = nil
 		contextPool.Put(sess)
+
+		sp.Manager.GCinvokeifnecessary(c.Request.Context, true)
 	})
 }

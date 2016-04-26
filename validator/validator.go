@@ -24,10 +24,10 @@ func NewRequestValueProvider(vl *http.Request) Provider {
 
 func NewRouterValueProvider(vl router.Parameter) Provider {
 	return func(name string) reflect.Value {
-		if vl.Index(name) == -1 {
+		if vl.IndexOf(name) == -1 {
 			return reflect.Value{}
 		}
-		return reflect.ValueOf(vl.Get(name))
+		return reflect.ValueOf(vl.ByName(name))
 	}
 }
 

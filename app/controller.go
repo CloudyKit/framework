@@ -26,7 +26,7 @@ type (
 	}
 
 	Controller interface {
-		Mux(Mapper)
+		Mux(*Mapper)
 	}
 )
 
@@ -45,7 +45,7 @@ func (app *Application) AddController(controllers ...Controller) {
 		name := structTyp.String()
 
 		// creates a new di for this controller
-		newDi := app.Di.Child()
+		newDi := app.Context.Child()
 		// creates a new cascade url generator
 		myGen := new(ctlGen)
 		// injects parent url generator
@@ -59,7 +59,7 @@ func (app *Application) AddController(controllers ...Controller) {
 		newFilter := new(request.Filters)
 		newDi.Map(newFilter)
 
-		controller.Mux(Mapper{
+		controller.Mux(&Mapper{
 			name:    name,
 			app:     app,
 			typ:     ptrTyp,
@@ -75,32 +75,18 @@ func (app *Application) AddController(controllers ...Controller) {
 }
 
 func (c *invokeController) Handle(rDi *request.Context) {
-
 	ii := c.pool.Get()
 	defer c.pool.Put(ii)
-	rDi.Di.Inject(ii)
-
-	if ii, isInitializer := ii.(interface {
-		Init()
-	}); isInitializer {
-		ii.Init()
-	}
+	rDi.Context.Inject(ii)
 
 	var arguments = [1]reflect.Value{reflect.ValueOf(ii)}
 	if c.isPtr == false {
 		arguments[0] = arguments[0].Elem()
 	}
-
 	c.funcValue.Call(arguments[0:])
-
-	if ii, isFinalizer := ii.(interface {
-		Finalize()
-	}); isFinalizer {
-		ii.Finalize()
-	}
 }
 
-var acRegex = regexp.MustCompile("[:*][^/]+")
+var acRegex = regexp.MustCompile("/[:*][^/]+")
 
 func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.ContextChain)) {
 	methodByname, isPtr := muxmap.typ.MethodByName(action)
@@ -110,7 +96,14 @@ func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(re
 			panic("Inválid action " + action + " not found in controller " + muxmap.typ.String())
 		}
 	}
-	muxmap.app.urlGen[muxmap.typ.Elem().String()+"."+action] = acRegex.ReplaceAllLiteralString(path, "%v")
+
+	muxmap.app.urlGen[muxmap.typ.Elem().String()+"."+action] = acRegex.ReplaceAllStringFunc(path, func(st string) string {
+		if st[1] == '*' {
+			return "%v"
+		}
+		return "/%v"
+	})
+
 	muxmap.app.AddHandlerContextName(muxmap.Di, muxmap.name, method, path, &invokeController{
 		pool:      muxmap.pool,
 		isPtr:     isPtr,

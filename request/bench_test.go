@@ -31,7 +31,7 @@ func (bb *BenchController) Mux(m app.Mapper) {
 }
 
 func (c *BenchController) RegisterHandler() {
-	context := c.Di.Child()
+	context := c.Context.Child()
 	defer context.Done()
 }
 
@@ -49,7 +49,7 @@ func init() {
 	)
 }
 func BenchmarkFlowRequest(b *testing.B) {
-	benchApp.Di.Map(b)
+	benchApp.context.Map(b)
 	request, _ := http.NewRequest("GET", "/", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.router.ServeHTTP(nil, request)
@@ -58,21 +58,21 @@ func BenchmarkFlowRequest(b *testing.B) {
 
 func BenchmarkFlowRequestMiddleware1(b *testing.B) {
 	request, _ := http.NewRequest("GET", "/middlewares/1", nil)
-	benchApp.Di.Map(b)
+	benchApp.context.Map(b)
 	for i := 0; i < b.N; i++ {
 		benchApp.router.ServeHTTP(nil, request)
 	}
 }
 
 func BenchmarkFlowRequestMiddleware4(b *testing.B) {
-	benchApp.Di.Map(b)
+	benchApp.context.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/4", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.router.ServeHTTP(nil, request)
 	}
 }
 func BenchmarkFlowRequestMiddleware24(b *testing.B) {
-	benchApp.Di.Map(b)
+	benchApp.context.Map(b)
 	request, _ := http.NewRequest("GET", "/middlewares/24", nil)
 	for i := 0; i < b.N; i++ {
 		benchApp.router.ServeHTTP(nil, request)

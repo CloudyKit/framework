@@ -6,14 +6,24 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 )
 
-type Store struct {
+type store struct {
 	BaseDir string
 }
 
-func (store Store) Reader(_ *context.Context, name string) (reader io.ReadCloser, err error) {
+func New(directory string) store {
+	directory, _ = filepath.Abs(directory)
+	_, err := os.Stat(directory)
+	if err != nil && os.IsNotExist(err) {
+		os.MkdirAll(directory, 0666)
+	}
+	return store{directory}
+}
+
+func (store store) Reader(_ *context.Context, name string) (reader io.ReadCloser, err error) {
 	reader, err = os.Open(path.Join(store.BaseDir, name))
 	if err != nil && os.IsNotExist(err) {
 		err = nil
@@ -21,16 +31,16 @@ func (store Store) Reader(_ *context.Context, name string) (reader io.ReadCloser
 	return
 }
 
-func (store Store) Writer(_ *context.Context, name string) (writer io.WriteCloser, err error) {
+func (store store) Writer(_ *context.Context, name string) (writer io.WriteCloser, err error) {
 	writer, err = os.Create(path.Join(store.BaseDir, name))
 	return
 }
 
-func (store Store) Remove(_ *context.Context, name string) error {
+func (store store) Remove(_ *context.Context, name string) error {
 	return os.Remove(path.Join(store.BaseDir, name))
 }
 
-func (store Store) Gc(_ *context.Context, before time.Time) {
+func (store store) Gc(_ *context.Context, before time.Time) {
 	files, err := ioutil.ReadDir(store.BaseDir)
 	if err != nil {
 		panic(err)

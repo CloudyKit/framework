@@ -14,7 +14,7 @@ import (
 
 type Context struct {
 	Name       string              // The name associated with the route
-	Di         *context.Context    // Dependency injection context
+	Context    *context.Context    // Dependency injection context
 	Request    *http.Request       // Request data passed by the router
 	Response   http.ResponseWriter // Response Writer passed by the router
 	Parameters router.Parameter    // Route Variables passed by the router
@@ -67,7 +67,7 @@ func (cc *Context) Cookie(name string) (value string) {
 	if cookie, _ := cc.Request.Cookie(name); cookie != nil {
 		var err error
 		value, err = url.QueryUnescape(cookie.Value)
-		cc.Notifier.NotifyIfNotNil(err)
+		cc.Notifier.ErrNotify(err)
 	}
 	return
 }
