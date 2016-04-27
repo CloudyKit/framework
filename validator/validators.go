@@ -8,6 +8,33 @@ import (
 	"time"
 )
 
+func Sub(runner func(At)) Tester {
+	return func(c *Context) {
+		cc := *c
+		value := c.Value
+		prefix := c.prefix + c.Name
+	restart:
+		switch value.Kind() {
+		case reflect.Array, reflect.Slice:
+			length := value.Len()
+			for i := 0; i < length; i++ {
+				c.target = value.Index(i)
+				c.prefix = prefix + fmt.Sprintf("[%d]", i)
+				runner(c.at)
+			}
+		case reflect.Struct, reflect.Map:
+			c.target = value
+			c.prefix = prefix
+			runner(c.at)
+		case reflect.Ptr, reflect.Interface:
+			value = value.Elem()
+			goto restart
+		}
+
+		*c = cc
+	}
+}
+
 func IsZero(v reflect.Value) bool {
 
 	if kind := v.Kind(); kind == reflect.Struct {

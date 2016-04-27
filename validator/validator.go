@@ -46,6 +46,7 @@ func (err Result) Rejected() bool {
 }
 
 type Context struct {
+	prefix   string
 	Name     string
 	Value    reflect.Value
 	target   reflect.Value
@@ -65,10 +66,10 @@ func (cc *Context) Done() Result {
 }
 
 func (cc *Context) Err(msg string) {
-	cc.errors = append(cc.errors, Error{Field: cc.Name, Description: msg})
+	cc.errors = append(cc.errors, Error{Field: cc.prefix + cc.Name, Description: msg})
 }
 
-func (cc *Context) At(fieldName string, vs ...Tester) *Context {
+func (cc *Context) at(fieldName string, vs ...Tester) *Context {
 	numValidators := len(vs)
 	cc.Value = cc.Field(fieldName)
 	cc.Name = fieldName
@@ -89,6 +90,6 @@ type At func(fieldName string, vs ...Tester) *Context
 
 func Run(target interface{}, aa func(At)) Result {
 	cc := New(target)
-	aa(cc.At)
+	aa(cc.at)
 	return cc.errors
 }

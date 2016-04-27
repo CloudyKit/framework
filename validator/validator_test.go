@@ -10,11 +10,11 @@ type User struct {
 
 func runValidation(u interface{}) Result {
 	return New(u).
-		At("FirstName",
+		at("FirstName",
 			NoEmpty("First Name can't be empty")).
-		At("LastName",
+		at("LastName",
 			NoEmpty("Last Name can not be empty")).
-		At("Email",
+		at("Email",
 			NoEmpty("Email can not be empty"),
 			Email("Please enter a valid email address")).
 		Done()

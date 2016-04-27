@@ -19,8 +19,8 @@ type viewPlugin struct {
 }
 
 func (viewPlugin viewPlugin) Init(di *context.Context) {
-	di.MapType((*Context)(nil), func(c *context.Context) interface{} {
-		cc := &Context{set: viewPlugin.set, rcontext: c.Get((*request.Context)(nil)).(*request.Context)}
+	di.MapType((*JetContext)(nil), func(c *context.Context) interface{} {
+		cc := &JetContext{set: viewPlugin.set, rcontext: c.Get((*request.Context)(nil)).(*request.Context)}
 		for key, value := range c.Get(Globals(nil)).(Globals) {
 			cc.With(key, value.Provide(c))
 		}
@@ -29,14 +29,14 @@ func (viewPlugin viewPlugin) Init(di *context.Context) {
 	})
 }
 
-type Context struct {
+type JetContext struct {
 	set      *jet.Set
 	scope    jet.VarMap
 	rcontext *request.Context
 	global   Globals
 }
 
-func (c *Context) Render(templateName string, context interface{}) error {
+func (c *JetContext) Render(templateName string, context interface{}) error {
 	t, err := c.set.LoadTemplate(templateName, "")
 	if err == nil {
 		err = t.Execute(c.rcontext.Response, c.scope, context)
@@ -44,7 +44,7 @@ func (c *Context) Render(templateName string, context interface{}) error {
 	return err
 }
 
-func (c *Context) WithValue(name string, v reflect.Value) *Context {
+func (c *JetContext) WithValue(name string, v reflect.Value) *JetContext {
 	if c.scope == nil {
 		c.scope = make(jet.VarMap)
 	}
@@ -52,7 +52,7 @@ func (c *Context) WithValue(name string, v reflect.Value) *Context {
 	return c
 }
 
-func (c *Context) With(name string, v interface{}) *Context {
+func (c *JetContext) With(name string, v interface{}) *JetContext {
 	if c.scope == nil {
 		c.scope = make(jet.VarMap)
 	}

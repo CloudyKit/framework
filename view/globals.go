@@ -3,6 +3,7 @@ package view
 import (
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/context"
+	"reflect"
 )
 
 type provider interface {
@@ -23,17 +24,21 @@ func (v valueProvider) Provide(c *context.Context) interface{} {
 }
 
 type contextProvider struct {
-	v interface{}
+	typeof reflect.Type
 }
 
 func (v contextProvider) Provide(c *context.Context) interface{} {
-	return c.Get(v.v)
+	return c.Val4Type(v.typeof)
 }
 
 type Globals map[string]provider
 
 func GlobalInjectName(ci *context.Context, name string, typ interface{}) error {
-	return globalNameProvider(ci, name, contextProvider{typ})
+	typeof := reflect.TypeOf(typ)
+	if typeof.Kind() == reflect.Ptr && typeof.Elem().Kind() == reflect.Interface {
+		typeof = typeof.Elem()
+	}
+	return globalNameProvider(ci, name, contextProvider{typeof})
 }
 func GlobalName(ci *context.Context, name string, v interface{}) error {
 	return globalNameProvider(ci, name, valueProvider{v})
