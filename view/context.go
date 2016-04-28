@@ -41,6 +41,9 @@ func (c *JetContext) Render(templateName string, context interface{}) error {
 	if err == nil {
 		err = t.Execute(c.rcontext.Response, c.scope, context)
 	}
+	if err != nil {
+		panic(err)
+	}
 	return err
 }
 
