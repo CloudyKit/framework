@@ -21,7 +21,7 @@ type viewPlugin struct {
 func (viewPlugin viewPlugin) PluginInit(di *context.Context) {
 	di.MapType((*JetContext)(nil), func(c *context.Context) interface{} {
 		cc := &JetContext{
-			set: viewPlugin.set,
+			set:      viewPlugin.set,
 			rcontext: c.Get((*request.Context)(nil)).(*request.Context),
 		}
 		for key, value := range c.Get(Globals(nil)).(Globals) {
