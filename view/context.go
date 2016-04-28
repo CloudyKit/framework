@@ -20,7 +20,10 @@ type viewPlugin struct {
 
 func (viewPlugin viewPlugin) PluginInit(di *context.Context) {
 	di.MapType((*JetContext)(nil), func(c *context.Context) interface{} {
-		cc := &JetContext{set: viewPlugin.set, rcontext: c.Get((*request.Context)(nil)).(*request.Context)}
+		cc := &JetContext{
+			set: viewPlugin.set,
+			rcontext: c.Get((*request.Context)(nil)).(*request.Context),
+		}
 		for key, value := range c.Get(Globals(nil)).(Globals) {
 			cc.With(key, value.Provide(c))
 		}
@@ -36,15 +39,12 @@ type JetContext struct {
 	global   Globals
 }
 
-func (c *JetContext) Render(templateName string, context interface{}) error {
+func (c *JetContext) Render(templateName string, context interface{}) *JetContext {
 	t, err := c.set.LoadTemplate(templateName, "")
-	if err == nil {
-		err = t.Execute(c.rcontext.Response, c.scope, context)
-	}
-	if err != nil {
-		panic(err)
-	}
-	return err
+	c.rcontext.Notifier.AssertNil("unexpected error loading template", err)
+	err = t.Execute(c.rcontext.Response, c.scope, context)
+	c.rcontext.Notifier.AssertNil("unexpected error executing template", err)
+	return c
 }
 
 func (c *JetContext) WithValue(name string, v reflect.Value) *JetContext {
