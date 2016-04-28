@@ -11,7 +11,7 @@ type Plugin struct {
 	Manager       *Manager
 }
 
-func (sp *Plugin) Init(di *context.Context) {
+func (sp *Plugin) PluginInit(di *context.Context) {
 
 	if sp.Manager == nil {
 		sp.Manager = di.Get(sp.Manager).(*Manager)

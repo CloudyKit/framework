@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -44,19 +45,38 @@ type Application struct {
 	Notifier errors.Notifier
 }
 
+type Bootstrapper interface {
+	Bootstrap(app *Application)
+}
+
 type Plugin interface {
-	Init(*context.Context)
+	PluginInit(*context.Context)
 }
 
 func LoadPlugins(di *context.Context, plugins ...Plugin) {
 	for i := 0; i < len(plugins); i++ {
 		di.Inject(plugins[i])
-		plugins[i].Init(di)
+		plugins[i].PluginInit(di)
 	}
 }
 
 func (app *Application) AddPlugin(plugins ...Plugin) {
 	LoadPlugins(app.Context, plugins...)
+}
+
+func (app Application) Bootstrap(b ...Bootstrapper) {
+	c := app.Context.Child()
+	for i := 0; i < len(b); i++ {
+		bv := reflect.ValueOf(b[i])
+		if bv.Kind() == reflect.Ptr {
+			bv = bv.Elem()
+			if bv.Kind() == reflect.Struct {
+				c.InjectStructValue(bv)
+			}
+		}
+		b[i].Bootstrap(&app)
+	}
+	c.Done()
 }
 
 func (app *Application) Done() {

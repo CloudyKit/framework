@@ -46,12 +46,15 @@ func (err Result) Rejected() bool {
 }
 
 type Context struct {
-	prefix   string
-	Name     string
-	Value    reflect.Value
-	target   reflect.Value
-	provider Provider
-	errors   Result
+	prefix      string
+	Name        string
+	Value       reflect.Value
+	target      reflect.Value
+	provider    Provider
+	errors      Result
+	aterror     bool
+	stoponerror bool
+	stopped     bool
 }
 
 func (cc *Context) Field(name string) reflect.Value {
@@ -66,20 +69,32 @@ func (cc *Context) Done() Result {
 }
 
 func (cc *Context) Err(msg string) {
+
+	if cc.stoponerror {
+		cc.stopped = true
+	}
+	cc.aterror = true
+
 	cc.errors = append(cc.errors, Error{Field: cc.prefix + cc.Name, Description: msg})
 }
 
 func (cc *Context) at(fieldName string, vs ...Tester) *Context {
-	numValidators := len(vs)
-	cc.Value = cc.Field(fieldName)
-	cc.Name = fieldName
-	for i := 0; i < numValidators; i++ {
-		vs[i](cc)
+	if !cc.stopped {
+		numValidators := len(vs)
+		cc.Value = cc.Field(fieldName)
+		cc.Name = fieldName
+		cc.aterror = false
+		for i := 0; i < numValidators; i++ {
+			vs[i](cc)
+			if cc.aterror {
+				return cc
+			}
+		}
 	}
 	return cc
 }
 
-func New(target interface{}) *Context {
+func newContext(target interface{}) *Context {
 	if target, isProvider := target.(Provider); isProvider {
 		return &Context{provider: target}
 	}
@@ -89,7 +104,14 @@ func New(target interface{}) *Context {
 type At func(fieldName string, vs ...Tester) *Context
 
 func Run(target interface{}, aa func(At)) Result {
-	cc := New(target)
+	cc := newContext(target)
+	aa(cc.at)
+	return cc.errors
+}
+
+func RunStop(target interface{}, aa func(At)) Result {
+	cc := newContext(target)
+	cc.stoponerror = true
 	aa(cc.at)
 	return cc.errors
 }

@@ -5,15 +5,12 @@ import (
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
-	"github.com/CloudyKit/framework/view"
 )
 
 func init() {
 	gob.Register((map[string]interface{})(nil))
 	app.Default.AddPlugin(NewPlugin(Session{defaultKey}))
 }
-
-var _ = view.AvailableKey(view.DefaultManager, "flashes", &Flasher{})
 
 type Store interface {
 	Read(*request.Context) (map[string]interface{}, error)
@@ -65,7 +62,7 @@ type flashPlugin struct {
 	Filters *request.Filters
 }
 
-func (plugin *flashPlugin) Init(di *context.Context) {
+func (plugin *flashPlugin) PluginInit(di *context.Context) {
 	store := plugin.Store
 	di.Inject(plugin)
 
@@ -75,12 +72,12 @@ func (plugin *flashPlugin) Init(di *context.Context) {
 
 	plugin.Filters.AddFilter(func(c request.ContextChain) {
 		readData, err := plugin.Read(c.Request)
-		c.Notifier.ErrNotify(err)
+		c.Request.Notifier.ErrNotify(err)
 		cc := &Flasher{Data: readData}
 		di.Map(cc)
 		c.Next()
 		if cc.writeData != nil {
-			c.Notifier.ErrNotify(plugin.Save(c.Request, cc.writeData))
+			c.Request.Notifier.ErrNotify(plugin.Save(c.Request, cc.writeData))
 		}
 	})
 

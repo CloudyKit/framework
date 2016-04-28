@@ -9,7 +9,7 @@ type User struct {
 }
 
 func runValidation(u interface{}) Result {
-	return New(u).
+	return newContext(u).
 		at("FirstName",
 			NoEmpty("First Name can't be empty")).
 		at("LastName",
