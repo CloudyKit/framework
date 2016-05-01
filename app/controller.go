@@ -11,33 +11,39 @@ import (
 
 type (
 	Mapper struct {
-		name string
-		typ  reflect.Type
-		pool *sync.Pool
-		app  *Application
-		Di   *context.Context
+		name      string
+		typ       reflect.Type
+		zeroValue reflect.Value
+
+		pool    *sync.Pool
+		app     *Application
+		Context *context.Context
+
 		*request.Filters
 	}
 
-	invokeController struct {
+	contextHandler struct {
 		pool      *sync.Pool
 		isPtr     bool
 		funcValue reflect.Value
+		zeroValue reflect.Value
 	}
 
-	Controller interface {
-		Mux(*Mapper)
+	appContext interface {
+		Mx(*Mapper)
 	}
 )
 
-func (app *Application) AddController(controllers ...Controller) {
+func (app *Application) AddController(controllers ...appContext) {
 	for i := 0; i < len(controllers); i++ {
 		controller := controllers[i]
 
 		ptrTyp := reflect.TypeOf(controller)
 		structTyp := ptrTyp
+		zero := reflect.ValueOf(controller)
 		if ptrTyp.Kind() == reflect.Ptr {
 			structTyp = ptrTyp.Elem()
+			zero = zero.Elem()
 		} else {
 			ptrTyp = reflect.PtrTo(ptrTyp)
 		}
@@ -59,12 +65,13 @@ func (app *Application) AddController(controllers ...Controller) {
 		newFilter := new(request.Filters)
 		newDi.Map(newFilter)
 
-		controller.Mux(&Mapper{
-			name:    name,
-			app:     app,
-			typ:     ptrTyp,
-			Di:      newDi,
-			Filters: newFilter,
+		controller.Mx(&Mapper{
+			name:      name,
+			app:       app,
+			typ:       ptrTyp,
+			Context:   newDi,
+			Filters:   newFilter,
+			zeroValue: zero,
 			pool: &sync.Pool{
 				New: func() interface{} {
 					return reflect.New(structTyp).Interface()
@@ -73,17 +80,21 @@ func (app *Application) AddController(controllers ...Controller) {
 		})
 	}
 }
-
-func (c *invokeController) Handle(rDi *request.Context) {
+func (c *contextHandler) Handle(rDi *request.Context) {
 	ii := c.pool.Get()
-	defer c.pool.Put(ii)
-	rDi.Context.Inject(ii)
+	// get's or allocates a new context
+	ctx := reflect.ValueOf(ii)
+	rDi.Context.InjectStructValue(ctx.Elem())
 
-	var arguments = [1]reflect.Value{reflect.ValueOf(ii)}
+	var arguments = [1]reflect.Value{ctx}
 	if c.isPtr == false {
 		arguments[0] = arguments[0].Elem()
 	}
+
 	c.funcValue.Call(arguments[0:])
+
+	ctx.Elem().Set(c.zeroValue)
+	c.pool.Put(ii)
 }
 
 var acRegex = regexp.MustCompile("/[:*][^/]+")
@@ -104,13 +115,14 @@ func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(re
 		return "/%v"
 	})
 
-	muxmap.app.AddHandlerContextName(muxmap.Di, muxmap.name, method, path, &invokeController{
+	muxmap.app.AddHandlerContextName(muxmap.Context, muxmap.name, method, path, &contextHandler{
 		pool:      muxmap.pool,
 		isPtr:     isPtr,
+		zeroValue: muxmap.zeroValue,
 		funcValue: methodByname.Func,
 	}, muxmap.MakeFilters(filters...)...)
 }
 
 func (muxmap *Mapper) AddPlugin(plugins ...Plugin) {
-	LoadPlugins(muxmap.Di, plugins...)
+	LoadPlugins(muxmap.Context, plugins...)
 }

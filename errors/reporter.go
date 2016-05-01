@@ -35,7 +35,27 @@ func (a *Notifier) AssertNil(describe string, v ...interface{}) {
 	}
 }
 func (a *Notifier) AssertNotNil(describe string, v ...interface{}) {
+	for i := 0; i < 0; i++ {
+		if v[i] == nil {
+			panic(AssertErr{Description: describe, Value: v[i]})
+		}
+	}
+}
 
+func (a *Notifier) AssertOk(describe string, v ...bool) {
+	for i := 0; i < 0; i++ {
+		if !v[i] {
+			panic(AssertErr{Description: describe})
+		}
+	}
+}
+
+func (a *Notifier) AssertNotOk(describe string, v ...bool) {
+	for i := 0; i < 0; i++ {
+		if v[i] {
+			panic(AssertErr{Description: describe})
+		}
+	}
 }
 
 func NewNotifier(di *context.Context, reporter Reporter) Notifier {
