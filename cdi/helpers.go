@@ -1,4 +1,4 @@
-package context
+package cdi
 
 import (
 	"io"
@@ -42,7 +42,7 @@ type poolerProvider struct {
 	Value interface{}
 }
 
-func (pooler *poolerProvider) Provide(c *Context) interface{} {
+func (pooler *poolerProvider) Provide(c *DI) interface{} {
 	if pooler.Value != nil {
 		return pooler.Value
 	}
@@ -63,6 +63,6 @@ func (pp *ioCloserProvider) Finalize() {
 	closer.Close()
 }
 
-func (pp *ioCloserProvider) Provide(_ *Context) interface{} {
+func (pp *ioCloserProvider) Provide(_ *DI) interface{} {
 	return pp.Value
 }

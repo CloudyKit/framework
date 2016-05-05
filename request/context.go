@@ -1,8 +1,7 @@
 package request
 
 import (
-	"github.com/CloudyKit/framework/context"
-	"github.com/CloudyKit/framework/errors"
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/validator"
 	"github.com/CloudyKit/router"
 
@@ -14,11 +13,10 @@ import (
 
 type Context struct {
 	Name       string              // The name associated with the route
-	Context    *context.Context    // Dependency injection context
+	Global     *cdi.DI             // Dependency injection context
 	Request    *http.Request       // Request data passed by the router
 	Response   http.ResponseWriter // Response Writer passed by the router
 	Parameters router.Parameter    // Route Variables passed by the router
-	Notifier   errors.Notifier     // Error errors reporters
 }
 
 func (cc *Context) ValidateRoute(c func(validator.At)) validator.Result {
@@ -65,9 +63,7 @@ func (cc *Context) Post(name string) string {
 
 func (cc *Context) Cookie(name string) (value string) {
 	if cookie, _ := cc.Request.Cookie(name); cookie != nil {
-		var err error
-		value, err = url.QueryUnescape(cookie.Value)
-		cc.Notifier.ErrNotify(err)
+		value, _ = url.QueryUnescape(cookie.Value)
 	}
 	return
 }

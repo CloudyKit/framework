@@ -2,24 +2,24 @@ package view
 
 import (
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/context"
+	"github.com/CloudyKit/framework/cdi"
 	"reflect"
 )
 
 type provider interface {
-	Provide(c *context.Context) interface{}
+	Provide(c *cdi.DI) interface{}
 }
 
 func init() {
 	var defaultGlobal = Globals{}
-	app.Default.Context.Map(defaultGlobal)
+	app.Default.Global.Map(defaultGlobal)
 }
 
 type valueProvider struct {
 	v interface{}
 }
 
-func (v valueProvider) Provide(c *context.Context) interface{} {
+func (v valueProvider) Provide(c *cdi.DI) interface{} {
 	return v.v
 }
 
@@ -27,24 +27,24 @@ type contextProvider struct {
 	typeof reflect.Type
 }
 
-func (v contextProvider) Provide(c *context.Context) interface{} {
+func (v contextProvider) Provide(c *cdi.DI) interface{} {
 	return c.Val4Type(v.typeof)
 }
 
 type Globals map[string]provider
 
-func GlobalInjectName(ci *context.Context, name string, typ interface{}) error {
+func GlobalInjectName(ci *cdi.DI, name string, typ interface{}) error {
 	typeof := reflect.TypeOf(typ)
 	if typeof.Kind() == reflect.Ptr && typeof.Elem().Kind() == reflect.Interface {
 		typeof = typeof.Elem()
 	}
 	return globalNameProvider(ci, name, contextProvider{typeof})
 }
-func GlobalName(ci *context.Context, name string, v interface{}) error {
+func GlobalName(ci *cdi.DI, name string, v interface{}) error {
 	return globalNameProvider(ci, name, valueProvider{v})
 }
 
-func globalNameProvider(ci *context.Context, name string, v provider) error {
+func globalNameProvider(ci *cdi.DI, name string, v provider) error {
 	globals := ci.Get(Globals(nil)).(Globals)
 	globals[name] = v
 	return nil

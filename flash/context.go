@@ -3,7 +3,7 @@ package flash
 import (
 	"encoding/gob"
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/context"
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
 )
 
@@ -62,7 +62,7 @@ type flashPlugin struct {
 	Filters *request.Filters
 }
 
-func (plugin *flashPlugin) PluginInit(di *context.Context) {
+func (plugin *flashPlugin) PluginInit(di *cdi.DI) {
 	store := plugin.Store
 	di.Inject(plugin)
 
@@ -70,14 +70,19 @@ func (plugin *flashPlugin) PluginInit(di *context.Context) {
 		plugin.Store = store
 	}
 
-	plugin.Filters.AddFilter(func(c request.ContextChain) {
-		readData, err := plugin.Read(c.Request)
-		c.Request.Notifier.ErrNotify(err)
+	plugin.Filters.AddFilter(func(c *request.Context, flow request.Flow) {
+		readData, err := plugin.Read(c)
+		if err != nil {
+			panic(err)
+		}
 		cc := &Flasher{Data: readData}
 		di.Map(cc)
-		c.Next()
+		flow.Continue()
 		if cc.writeData != nil {
-			c.Request.Notifier.ErrNotify(plugin.Save(c.Request, cc.writeData))
+			err = plugin.Save(c, cc.writeData)
+			if err != nil {
+				panic(err)
+			}
 		}
 	})
 

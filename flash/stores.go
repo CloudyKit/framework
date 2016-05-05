@@ -20,7 +20,7 @@ func (sess *Session) getKey() string {
 }
 
 func (sess Session) getSession(r *request.Context) (*session.Session, error) {
-	sessContext := r.Context.Get((*session.Session)(nil)).(*session.Session)
+	sessContext := r.Global.Get((*session.Session)(nil)).(*session.Session)
 	if sessContext == nil {
 		return nil, errors.New("Session is not available in the context")
 	}

@@ -1,9 +1,10 @@
 package session
 
 import (
-	"github.com/CloudyKit/framework/context"
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
 	"net/http"
+	"reflect"
 )
 
 type Plugin struct {
@@ -11,7 +12,13 @@ type Plugin struct {
 	Manager       *Manager
 }
 
-func (sp *Plugin) PluginInit(di *context.Context) {
+var SessionType = reflect.TypeOf((*Session)(nil))
+
+func Get(cdi *cdi.DI) *Session {
+	return cdi.Val4Type(SessionType).(*Session)
+}
+
+func (sp *Plugin) PluginInit(di *cdi.DI) {
 
 	if sp.Manager == nil {
 		sp.Manager = di.Get(sp.Manager).(*Manager)
@@ -23,22 +30,27 @@ func (sp *Plugin) PluginInit(di *context.Context) {
 
 	filters := di.Get((*request.Filters)(nil)).(*request.Filters)
 
-	filters.AddFilter(func(c request.ContextChain) {
-		sess := contextPool.Get().(*Session)
-		sess.Data = make(sessionData)
+	filters.AddFilter(func(c *request.Context, f request.Flow) {
 
-		c.Request.Context.Map(sess)
+		s := contextPool.Get().(*Session)
+		s.Data = make(sessionData)
 
-		if rCookie, _ := c.Request.Request.Cookie(sp.CookieOptions.Name); rCookie == nil {
-			sess.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
+		c.Global.Map(s)
+
+		if readedcookie, _ := c.Request.Cookie(sp.CookieOptions.Name); readedcookie == nil {
+			s.id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
-			sess.id = sp.Manager.Generator.Generate(rCookie.Value, sp.CookieOptions.Name)
-			c.Request.Notifier.ErrNotify(sp.Manager.Open(c.Request.Context, rCookie.Value, &sess.Data))
+			s.id = sp.Manager.Generator.Generate(readedcookie.Value, sp.CookieOptions.Name)
+			err := sp.Manager.Open(c.Global, readedcookie.Value, &s.Data)
+			if err != nil {
+				s.done(err)
+			}
 		}
-		// sets the cookie
-		http.SetCookie(c.Request.Response, &http.Cookie{
+
+		// resets the cookie
+		http.SetCookie(c.Response, &http.Cookie{
 			Name:     sp.CookieOptions.Name,
-			Value:    sess.id,
+			Value:    s.id,
 			Path:     sp.CookieOptions.Path,
 			Domain:   sp.CookieOptions.Domain,
 			Secure:   sp.CookieOptions.Secure,
@@ -47,12 +59,11 @@ func (sp *Plugin) PluginInit(di *context.Context) {
 			Expires:  sp.CookieOptions.Expires,
 		})
 
-		c.Next()
+		f.Continue()
 
-		c.Request.Notifier.ErrNotify(sp.Manager.Save(c.Request.Context, sess.id, sess.Data))
-		sess.Data = nil
-		contextPool.Put(sess)
+		err := sp.Manager.Save(c.Global, s.id, s.Data)
+		s.done(err)
 
-		sp.Manager.GCinvokeifnecessary(c.Request.Context, true)
+		sp.Manager.GCinvokeifnecessary(c.Global, true)
 	})
 }

@@ -44,6 +44,16 @@ type Session struct {
 	Data sessionData
 }
 
+func (c *Session) done(errs ...error) {
+	c.Data = nil
+	contextPool.Put(c)
+	for i := 0; i < len(errs); i++ {
+		if errs[i] != nil {
+			panic(errs[i])
+		}
+	}
+}
+
 func (c *Session) Id() string {
 	return c.id
 }
@@ -52,6 +62,7 @@ func (c *Session) Contains(key string) (contains bool) {
 	_, contains = c.Data[key]
 	return
 }
+
 func (c *Session) Get(name string) (value interface{}) {
 	value, _ = c.Data[name]
 	return

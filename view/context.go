@@ -2,7 +2,7 @@ package view
 
 import (
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/context"
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/jet"
 	"reflect"
@@ -18,8 +18,14 @@ type viewPlugin struct {
 	set *jet.Set
 }
 
-func (viewPlugin viewPlugin) PluginInit(di *context.Context) {
-	di.MapType((*JetContext)(nil), func(c *context.Context) interface{} {
+var JetContextType = reflect.TypeOf((*JetContext)(nil))
+
+func GetJetContext(cdi *cdi.DI) *JetContext {
+	return cdi.Val4Type(JetContextType).(*JetContext)
+}
+
+func (viewPlugin viewPlugin) PluginInit(di *cdi.DI) {
+	di.MapType(JetContextType, func(c *cdi.DI) interface{} {
 		cc := &JetContext{
 			set:      viewPlugin.set,
 			rcontext: c.Get((*request.Context)(nil)).(*request.Context),
@@ -41,9 +47,13 @@ type JetContext struct {
 
 func (c *JetContext) Render(templateName string, context interface{}) *JetContext {
 	t, err := c.set.LoadTemplate(templateName, "")
-	c.rcontext.Notifier.AssertNil("unexpected error loading template", err)
+	if err != nil {
+		panic(err)
+	}
 	err = t.Execute(c.rcontext.Response, c.scope, context)
-	c.rcontext.Notifier.AssertNil("unexpected error executing template", err)
+	if err != nil {
+		panic(err)
+	}
 	return c
 }
 

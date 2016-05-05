@@ -1,14 +1,11 @@
 package app
 
 import (
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
-	"github.com/CloudyKit/framework/context"
-	"github.com/CloudyKit/framework/errors"
-	"github.com/CloudyKit/framework/errors/reporters"
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/router"
 
-	"fmt"
 	"net/http"
 	"os"
 	"reflect"
@@ -19,30 +16,26 @@ var Default = New()
 
 func New() *Application {
 
-	newApp := &Application{Context: context.New(), router: router.New(), urlGen: make(urlGen), Filters: new(request.Filters)}
+	newApp := &Application{Global: cdi.New(), Router: router.New(), urlGen: make(urlGen), Filters: new(request.Filters)}
 
-	// setups default err reporter
-	newApp.Notifier = errors.NewNotifier(newApp.Context, reporters.LogReporter{})
 	// provide application urlGen as URLer
-	newApp.Context.MapType((*common.URLer)(nil), newApp.urlGen)
+	newApp.Global.MapType((*common.URLer)(nil), newApp.urlGen)
 	// provide Filters plugins added in the application can setup filters
-	newApp.Context.Map(newApp.Filters)
+	newApp.Global.Map(newApp.Filters)
 	// provide the Router
-	newApp.Context.Map(newApp.router)
+	newApp.Global.Map(newApp.Router)
 	// provide the app
-	newApp.Context.Map(newApp)
-	// provide error catcher
-	newApp.Context.Map(newApp.Notifier)
+	newApp.Global.Map(newApp)
 	return newApp
 }
 
 type Application struct {
-	Context *context.Context // Di dependency injection context
-	router  *router.Router   // Router
+	Global *cdi.DI        // Di dependency injection context
+	Router *router.Router // Router
 
 	urlGen urlGen //
 	*request.Filters
-	Notifier errors.Notifier
+	Prefix string
 }
 
 type Bootstrapper interface {
@@ -50,10 +43,10 @@ type Bootstrapper interface {
 }
 
 type Plugin interface {
-	PluginInit(*context.Context)
+	PluginInit(*cdi.DI)
 }
 
-func LoadPlugins(di *context.Context, plugins ...Plugin) {
+func LoadPlugins(di *cdi.DI, plugins ...Plugin) {
 	for i := 0; i < len(plugins); i++ {
 		di.Inject(plugins[i])
 		plugins[i].PluginInit(di)
@@ -61,17 +54,17 @@ func LoadPlugins(di *context.Context, plugins ...Plugin) {
 }
 
 func (app *Application) AddPlugin(plugins ...Plugin) {
-	LoadPlugins(app.Context, plugins...)
+	LoadPlugins(app.Global, plugins...)
 }
 
 func (app Application) Bootstrap(b ...Bootstrapper) {
-	c := app.Context.Child()
+	c := app.Global.Child()
 	for i := 0; i < len(b); i++ {
 		bv := reflect.ValueOf(b[i])
 		if bv.Kind() == reflect.Ptr {
 			bv = bv.Elem()
 			if bv.Kind() == reflect.Struct {
-				c.InjectStructValue(bv)
+				c.InjectInStructValue(bv)
 			}
 		}
 		b[i].Bootstrap(&app)
@@ -80,64 +73,66 @@ func (app Application) Bootstrap(b ...Bootstrapper) {
 }
 
 func (app *Application) Done() {
-	app.Context.Done()
+	app.Global.Done()
 }
 
-type FuncHandler func(*request.Context)
+type funcHandler func(*request.Context)
 
-func (fn FuncHandler) Handle(c *request.Context) {
+func (fn funcHandler) Handle(c *request.Context) {
 	fn(c)
 }
 
-func (add *Application) AddFunc(method, path string, fn FuncHandler, filters ...func(request.ContextChain)) {
+func (add *Application) AddHandlerFunc(method, path string, fn funcHandler, filters ...func(*request.Context, request.Flow)) {
 	add.AddHandler(method, path, fn, filters...)
 }
 
-func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
+func (app *Application) AddHandler(method, path string, handler request.Handler, filters ...func(*request.Context, request.Flow)) {
 	app.AddHandlerName("", method, path, handler, filters...)
 }
 
-func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
-	app.AddHandlerContextName(app.Context, name, method, path, handler, filters...)
+func (app *Application) AddHandlerName(name, method, path string, handler request.Handler, filters ...func(*request.Context, request.Flow)) {
+	app.AddHandlerContextName(app.Global, name, method, path, handler, filters...)
 }
 
 // AddHandlerContextName accepts a context, a name identifier, http method|methods, pattern path, handler and filters
 // ex: one handler app.AddHandlerContextName(myContext,"mySectionIdentifier","GET", "/public",fileServer,checkAuth)
 //     multiples handles app.AddHandlerContextName(myContext,"mySectionIdentifier","GET|POST|SEARCH", "/products",productHandler,checkAuth)
-func (app *Application) AddHandlerContextName(context *context.Context, name, method, path string, handler request.Handler, filters ...func(request.ContextChain)) {
+func (app *Application) AddHandlerContextName(context *cdi.DI, name, method, path string, handler request.Handler, filters ...func(*request.Context, request.Flow)) {
+
 	filters = app.MakeFilters(filters...)
+
 	if context == nil {
-		context = app.Context
+		context = app.Global
 	}
+
 	for _, method := range strings.Split(method, "|") {
-		app.router.AddRoute(method, path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
-			cc := request.New(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Context: context.Child()})
-			defer cc.Context.Done() // call finalizers
-			cc.Context.Map(cc)      // self inject
-			cc.Notifier = cc.Context.Get(cc.Notifier).(errors.Notifier)
-			request.NewContextChain(cc, handler, filters).Next()
+		app.Router.AddRoute(method, app.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
+			cc := request.New(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Global: context.Child()})
+			defer cc.Global.Done() // call finalizers
+			cc.Global.Map(cc)      // self inject
+			request.NewContextChain(cc, handler, filters).Continue()
 		})
 	}
 }
 
-// RunServer runs the application in the default HTTP server
-// optional arguments port,certfile,keyfile
-func (app *Application) RunServer(args ...string) *Application {
-	var host string
-	if len(args) > 0 {
-		host = os.Getenv(args[0])
-		if host == "" {
-			host = args[0]
-		}
-	} else {
-		host = os.Getenv("PORT")
+func (app *Application) host(host string) (servein string) {
+	// if host is empty set host apphost
+	if host == "" {
+		host = "apphost"
 	}
-	if len(args) < 2 {
-		app.Notifier.ErrNotify(http.ListenAndServe(host, app.router))
-	} else if len(args) == 3 {
-		app.Notifier.ErrNotify(http.ListenAndServeTLS(host, args[1], args[2], app.router))
-	} else {
-		app.Notifier.ErrNotify(fmt.Errorf("Inválid number of arguments on App.RunServer"))
+	// check if host is an env variable containing a host string
+	servein = os.Getenv(host)
+	// if host is not an env variable than is a host string
+	if servein == "" {
+		servein = host
 	}
-	return app
+	return
+}
+
+func (app *Application) RunServer(host string) error {
+	return http.ListenAndServe(app.host(host), app.Router)
+}
+
+func (app *Application) RunServerTls(host, certfile, keyfile string) error {
+	return http.ListenAndServeTLS(app.host(host), certfile, keyfile, app.Router)
 }

@@ -1,8 +1,8 @@
 package app
 
 import (
+	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
-	"github.com/CloudyKit/framework/context"
 	"github.com/CloudyKit/framework/request"
 	"reflect"
 	"regexp"
@@ -17,7 +17,7 @@ type (
 
 		pool    *sync.Pool
 		app     *Application
-		Context *context.Context
+		Context *cdi.DI
 
 		*request.Filters
 	}
@@ -51,7 +51,7 @@ func (app *Application) AddController(controllers ...appContext) {
 		name := structTyp.String()
 
 		// creates a new di for this controller
-		newDi := app.Context.Child()
+		newDi := app.Global.Child()
 		// creates a new cascade url generator
 		myGen := new(ctlGen)
 		// injects parent url generator
@@ -84,7 +84,7 @@ func (c *contextHandler) Handle(rDi *request.Context) {
 	ii := c.pool.Get()
 	// get's or allocates a new context
 	ctx := reflect.ValueOf(ii)
-	rDi.Context.InjectStructValue(ctx.Elem())
+	rDi.Global.InjectInStructValue(ctx.Elem())
 
 	var arguments = [1]reflect.Value{ctx}
 	if c.isPtr == false {
@@ -99,7 +99,7 @@ func (c *contextHandler) Handle(rDi *request.Context) {
 
 var acRegex = regexp.MustCompile("/[:*][^/]+")
 
-func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(request.ContextChain)) {
+func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(*request.Context, request.Flow)) {
 	methodByname, isPtr := muxmap.typ.MethodByName(action)
 	if !isPtr {
 		methodByname, _ = muxmap.typ.Elem().MethodByName(action)
