@@ -38,6 +38,14 @@ var (
 	walkableFields = map[reflect.Type]struct{}{}
 )
 
+func TypeOfElem(i interface{}) reflect.Type {
+	return reflect.TypeOf(i).Elem()
+}
+
+func TypeOf(i interface{}) reflect.Type {
+	return reflect.TypeOf(i)
+}
+
 // Walkable marks the type as field to be walked while searching for fields to inject
 func Walkable(v ...interface{}) uint {
 	for i := 0; i < len(v); i++ {
@@ -98,16 +106,7 @@ func (c *DI) InjectInStructValue(value reflect.Value) {
 }
 
 // Set sets a provider for the type of typ with value of val
-func (c *DI) MapType(typ, val interface{}) {
-	typOf, ok := typ.(reflect.Type)
-
-	if !ok {
-		typOf = reflect.TypeOf(typ)
-	}
-
-	if typOf.Kind() == reflect.Ptr && typOf.Elem().Kind() == reflect.Interface {
-		typOf = typOf.Elem()
-	}
+func (c *DI) MapType(typOf reflect.Type, val interface{}) {
 	c.values[typOf] = val
 }
 

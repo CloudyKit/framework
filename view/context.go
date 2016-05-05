@@ -11,11 +11,11 @@ import (
 var DefaultSet = jet.NewHTMLSet("./views")
 
 func init() {
-	app.Default.AddPlugin(viewPlugin{DefaultSet})
+	app.Default.Bootstrap(BootJet{DefaultSet})
 }
 
-type viewPlugin struct {
-	set *jet.Set
+type BootJet struct {
+	Set *jet.Set
 }
 
 var JetContextType = reflect.TypeOf((*JetContext)(nil))
@@ -24,16 +24,16 @@ func GetJetContext(cdi *cdi.DI) *JetContext {
 	return cdi.Val4Type(JetContextType).(*JetContext)
 }
 
-func (viewPlugin viewPlugin) PluginInit(di *cdi.DI) {
-	di.MapType(JetContextType, func(c *cdi.DI) interface{} {
+func (p BootJet) Bootstrap(a *app.App) {
+	a.Global.MapType(JetContextType, func(cdi *cdi.DI) interface{} {
 		cc := &JetContext{
-			set:      viewPlugin.set,
-			rcontext: c.Get((*request.Context)(nil)).(*request.Context),
+			set:      p.Set,
+			rcontext: request.Get(cdi),
 		}
-		for key, value := range c.Get(Globals(nil)).(Globals) {
-			cc.With(key, value.Provide(c))
+		for key, value := range cdi.Get(Globals(nil)).(Globals) {
+			cc.With(key, value.Provide(cdi))
 		}
-		c.Map(cc)
+		cdi.MapType(JetContextType, cc)
 		return cc
 	})
 }

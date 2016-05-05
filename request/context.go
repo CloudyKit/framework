@@ -8,8 +8,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sync"
 )
+
+var ContextType = reflect.TypeOf((*Context)(nil))
+
+func Get(cdi *cdi.DI) *Context {
+	return cdi.Val4Type(ContextType).(*Context)
+}
 
 type Context struct {
 	Name       string              // The name associated with the route

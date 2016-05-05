@@ -13,15 +13,16 @@ var (
 	rwMx          = sync.Mutex{}
 )
 
-func persistPtr(typOf reflect.Type, diContext *cdi.DI, mapto string, i interface{}) {
+func persistPtr(typOf reflect.Type, c *cdi.DI, mapto string) {
 	structTyp := typOf.Elem()
+
 	if structTyp.Kind() != reflect.Struct {
 		panic(fmt.Errorf("Type %q is not a pointer to struct", typOf))
 	}
 
 	sessionsTypes[typOf] = mapto
-	diContext.MapType(i, func(c *cdi.DI) (ret interface{}) {
-		sess := c.Get((*Session)(nil)).(*Session)
+	c.MapType(typOf, func(c *cdi.DI) (ret interface{}) {
+		sess := Get(c)
 		ret = sess.Get(mapto)
 		if ret == nil {
 			ret = reflect.New(structTyp).Interface()
@@ -32,9 +33,9 @@ func persistPtr(typOf reflect.Type, diContext *cdi.DI, mapto string, i interface
 	})
 }
 
-func persistStruct(typOf reflect.Type, diContext *cdi.DI, mapto string, i interface{}) {
-	diContext.MapType(i, func(c *cdi.DI, t reflect.Value) {
-		sess := c.Get((*Session)(nil)).(*Session)
+func persistStruct(typOf reflect.Type, c *cdi.DI, mapto string) {
+	c.MapType(typOf, func(c *cdi.DI, t reflect.Value) {
+		sess := Get(c)
 		val := sess.Get(mapto)
 		if val != nil {
 			valueOf := reflect.ValueOf(val)
@@ -47,11 +48,11 @@ func persistStruct(typOf reflect.Type, diContext *cdi.DI, mapto string, i interf
 	})
 }
 
-func Persist(diContext *cdi.DI, i interface{}) error {
-	return PersistKey(diContext, "", i)
+func Persist(c *cdi.DI, i interface{}) error {
+	return PersistKey(c, "", i)
 }
 
-func PersistKey(diContext *cdi.DI, key string, i interface{}) error {
+func PersistKey(c *cdi.DI, key string, i interface{}) error {
 	rwMx.Lock()
 	defer rwMx.Unlock()
 	typOf := reflect.TypeOf(i)
@@ -69,9 +70,9 @@ func PersistKey(diContext *cdi.DI, key string, i interface{}) error {
 
 		switch typOf.Kind() {
 		case reflect.Ptr:
-			persistPtr(typOf, diContext, key, i)
+			persistPtr(typOf, c, key)
 		case reflect.Struct:
-			persistStruct(typOf, diContext, key, i)
+			persistStruct(typOf, c, key)
 		default:
 			panic(fmt.Errorf("Type %q is not a válid typ", typOf))
 		}

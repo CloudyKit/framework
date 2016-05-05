@@ -12,7 +12,7 @@ type Session struct {
 	Key string
 }
 
-func (sess *Session) getKey() string {
+func (sess Session) getKey() string {
 	if sess.Key == "" {
 		return defaultKey
 	}

@@ -24,7 +24,7 @@ var (
 
 func init() {
 	gob.Register(sessionData(nil))
-	app.Default.AddPlugin(&Plugin{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
+	app.Default.Bootstrap(&Boot{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
 }
 
 func New(gcEvery time.Duration, duration time.Duration, store Store, serializer Serializer, generator IdGenerator) *Manager {

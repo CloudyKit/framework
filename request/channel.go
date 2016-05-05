@@ -4,21 +4,6 @@ import (
 	"errors"
 )
 
-type Filters struct {
-	filters []func(*Context, Flow)
-}
-
-func (f *Filters) AddFilter(filters ...func(*Context, Flow)) {
-	f.filters = append(f.filters, filters...)
-}
-
-func (f *Filters) MakeFilters(filters ...func(*Context, Flow)) []func(*Context, Flow) {
-	newFilter := make([]func(*Context, Flow), 0, len(f.filters)+len(filters))
-	newFilter = append(newFilter, f.filters...)
-	newFilter = append(newFilter, filters...)
-	return newFilter
-}
-
 func NewContextChain(r *Context, handler Handler, filters []func(*Context, Flow)) Flow {
 	return Flow{context: r, handler: handler, filters: filters}
 }

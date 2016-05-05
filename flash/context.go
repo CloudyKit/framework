@@ -5,11 +5,12 @@ import (
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
+	"reflect"
 )
 
 func init() {
 	gob.Register((map[string]interface{})(nil))
-	app.Default.AddPlugin(NewPlugin(Session{defaultKey}))
+	app.Default.Bootstrap(Boot{Session{defaultKey}})
 }
 
 type Store interface {
@@ -20,6 +21,8 @@ type Store interface {
 type Flasher struct {
 	writeData map[string]interface{}
 	Data      map[string]interface{}
+	store     Store
+	context   *request.Context
 }
 
 func (c *Flasher) Reflash(keys ...string) {
@@ -51,39 +54,41 @@ func (c *Flasher) Set(key string, val interface{}) {
 	c.writeData[key] = val
 }
 
-func NewPlugin(store Store) app.Plugin {
-	plugin := new(flashPlugin)
-	plugin.Store = store
-	return plugin
-}
-
-type flashPlugin struct {
+type Boot struct {
 	Store
-	Filters *request.Filters
 }
 
-func (plugin *flashPlugin) PluginInit(di *cdi.DI) {
-	store := plugin.Store
-	di.Inject(plugin)
+var FlasherType = reflect.TypeOf((*Flasher)(nil))
 
-	if store != nil {
-		plugin.Store = store
-	}
+func Get(cdi *cdi.DI) *Flasher {
+	return cdi.Val4Type(cdi).(*Flasher)
+}
 
-	plugin.Filters.AddFilter(func(c *request.Context, flow request.Flow) {
-		readData, err := plugin.Read(c)
+type flasher Flasher
+
+func (f *flasher) Finalize() {
+	if f.writeData != nil {
+		err := f.store.Save(f.context, f.writeData)
 		if err != nil {
 			panic(err)
 		}
-		cc := &Flasher{Data: readData}
-		di.Map(cc)
-		flow.Continue()
-		if cc.writeData != nil {
-			err = plugin.Save(c, cc.writeData)
-			if err != nil {
-				panic(err)
-			}
+	}
+}
+
+func (f *flasher) Provide(cdi *cdi.DI) interface{} {
+	return (*Flasher)(f)
+}
+
+func (p *Boot) Bootstrap(a *app.App) {
+
+	a.Global.MapType(FlasherType, func(c *cdi.DI) interface{} {
+		readData, err := p.Read(c)
+		if err != nil {
+			panic(err)
 		}
+		cc := &flasher{Data: readData, store: p.Store, context: request.Get(c)}
+		c.MapType(FlasherType, cc)
+		return (*Flasher)(cc)
 	})
 
 }

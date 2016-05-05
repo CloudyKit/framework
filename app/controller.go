@@ -16,10 +16,10 @@ type (
 		zeroValue reflect.Value
 
 		pool    *sync.Pool
-		app     *Application
+		app     *App
 		Context *cdi.DI
 
-		*request.Filters
+		filterManager
 	}
 
 	contextHandler struct {
@@ -34,7 +34,7 @@ type (
 	}
 )
 
-func (app *Application) AddController(controllers ...appContext) {
+func (app *App) AddController(controllers ...appContext) {
 	for i := 0; i < len(controllers); i++ {
 		controller := controllers[i]
 
@@ -60,18 +60,15 @@ func (app *Application) AddController(controllers ...appContext) {
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
-		newDi.MapType((*common.URLer)(nil), myGen)
-
-		newFilter := new(request.Filters)
-		newDi.Map(newFilter)
+		newDi.MapType(common.URLerType, myGen)
 
 		controller.Mx(&Mapper{
-			name:      name,
-			app:       app,
-			typ:       ptrTyp,
-			Context:   newDi,
-			Filters:   newFilter,
-			zeroValue: zero,
+			name:          name,
+			app:           app,
+			typ:           ptrTyp,
+			Context:       newDi,
+			filterManager: filterManager{filters: app.reslice()},
+			zeroValue:     zero,
 			pool: &sync.Pool{
 				New: func() interface{} {
 					return reflect.New(structTyp).Interface()
@@ -120,9 +117,5 @@ func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(*r
 		isPtr:     isPtr,
 		zeroValue: muxmap.zeroValue,
 		funcValue: methodByname.Func,
-	}, muxmap.MakeFilters(filters...)...)
-}
-
-func (muxmap *Mapper) AddPlugin(plugins ...Plugin) {
-	LoadPlugins(muxmap.Context, plugins...)
+	}, muxmap.reslice(filters...)...)
 }
