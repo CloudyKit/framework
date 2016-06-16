@@ -11,13 +11,14 @@ import (
 
 type (
 	Mapper struct {
+		Prefix    string
 		name      string
 		typ       reflect.Type
 		zeroValue reflect.Value
 
-		pool    *sync.Pool
-		app     *App
-		Context *cdi.DI
+		pool   *sync.Pool
+		app    *App
+		Global *cdi.Global
 
 		filterManager
 	}
@@ -63,12 +64,11 @@ func (app *App) AddController(controllers ...appContext) {
 		newDi.MapType(common.URLerType, myGen)
 
 		controller.Mx(&Mapper{
-			name:          name,
-			app:           app,
-			typ:           ptrTyp,
-			Context:       newDi,
-			filterManager: filterManager{filters: app.reslice()},
-			zeroValue:     zero,
+			name:      name,
+			app:       app,
+			typ:       ptrTyp,
+			Global:    newDi,
+			zeroValue: zero,
 			pool: &sync.Pool{
 				New: func() interface{} {
 					return reflect.New(structTyp).Interface()
@@ -77,45 +77,47 @@ func (app *App) AddController(controllers ...appContext) {
 		})
 	}
 }
-func (c *contextHandler) Handle(rDi *request.Context) {
-	ii := c.pool.Get()
+
+func (handler *contextHandler) Handle(c *request.Context) {
+	ii := handler.pool.Get()
+
 	// get's or allocates a new context
 	ctx := reflect.ValueOf(ii)
-	rDi.Global.InjectInStructValue(ctx.Elem())
+	c.Global.InjectInStructValue(ctx.Elem())
 
 	var arguments = [1]reflect.Value{ctx}
-	if c.isPtr == false {
+	if handler.isPtr == false {
 		arguments[0] = arguments[0].Elem()
 	}
 
-	c.funcValue.Call(arguments[0:])
+	handler.funcValue.Call(arguments[0:])
 
-	ctx.Elem().Set(c.zeroValue)
-	c.pool.Put(ii)
+	ctx.Elem().Set(handler.zeroValue)
+	handler.pool.Put(ii)
 }
 
 var acRegex = regexp.MustCompile("/[:*][^/]+")
 
-func (muxmap *Mapper) AddHandler(method, path, action string, filters ...func(*request.Context, request.Flow)) {
-	methodByname, isPtr := muxmap.typ.MethodByName(action)
+func (mx *Mapper) AddHandler(method, path, action string, filters ...request.Filter) {
+	methodByName, isPtr := mx.typ.MethodByName(action)
 	if !isPtr {
-		methodByname, _ = muxmap.typ.Elem().MethodByName(action)
-		if methodByname.Type == nil {
-			panic("Inválid action " + action + " not found in controller " + muxmap.typ.String())
+		methodByName, _ = mx.typ.Elem().MethodByName(action)
+		if methodByName.Type == nil {
+			panic("Inválid action " + action + " not found in controller " + mx.typ.String())
 		}
 	}
 
-	muxmap.app.urlGen[muxmap.typ.Elem().String()+"."+action] = acRegex.ReplaceAllStringFunc(path, func(st string) string {
+	mx.app.urlGen[mx.typ.Elem().String()+"."+action] = acRegex.ReplaceAllStringFunc(mx.app.Prefix+mx.Prefix+path, func(st string) string {
 		if st[1] == '*' {
 			return "%v"
 		}
 		return "/%v"
 	})
 
-	muxmap.app.AddHandlerContextName(muxmap.Context, muxmap.name, method, path, &contextHandler{
-		pool:      muxmap.pool,
+	mx.app.AddHandlerContextName(mx.Global, mx.name, method, mx.Prefix+path, &contextHandler{
+		pool:      mx.pool,
 		isPtr:     isPtr,
-		zeroValue: muxmap.zeroValue,
-		funcValue: methodByname.Func,
-	}, muxmap.reslice(filters...)...)
+		zeroValue: mx.zeroValue,
+		funcValue: methodByName.Func,
+	}, mx.reslice(filters...)...)
 }

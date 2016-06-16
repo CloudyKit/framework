@@ -9,13 +9,13 @@ import (
 )
 
 var (
-	DefaultManager = New(time.Hour, time.Hour*2, file.New("./sessions"), GobSerializer{}, RandGenerator{})
+	DefaultManager = New(time.Hour, time.Hour*2, file.New("./resources/sessions"), GobSerializer{}, RandGenerator{})
 
 	DefaultCookieOptions = &CookieOptions{
 		Name: "__gsid",
 	}
 
-	contextPool = sync.Pool{
+	_sessionPool = sync.Pool{
 		New: func() interface{} {
 			return &Session{}
 		},
@@ -23,64 +23,58 @@ var (
 )
 
 func init() {
-	gob.Register(sessionData(nil))
+	gob.Register(SessionData(nil))
 	app.Default.Bootstrap(&Boot{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
 }
 
 func New(gcEvery time.Duration, duration time.Duration, store Store, serializer Serializer, generator IdGenerator) *Manager {
-	return &Manager{
+	manager := &Manager{
 		Generator:  generator,
 		gcEvery:    gcEvery,
 		Duration:   duration,
 		Store:      store,
 		Serializer: serializer,
 	}
+
+	manager.donechan = make(chan *mJob)
+	manager.workchan = make(chan *mJob)
+
+	manager.Store.GC(manager.Global, time.Now().Add(-manager.Duration))
+
+	go manager.work()
+	return manager
 }
 
-type sessionData map[string]interface{}
+type SessionData map[string]interface{}
 
 type Session struct {
-	id   string
-	Data sessionData
-}
-
-func (c *Session) done(errs ...error) {
-	c.Data = nil
-	contextPool.Put(c)
-	for i := 0; i < len(errs); i++ {
-		if errs[i] != nil {
-			panic(errs[i])
-		}
-	}
-}
-
-func (c *Session) Id() string {
-	return c.id
+	ID   string
+	data SessionData
 }
 
 func (c *Session) Contains(key string) (contains bool) {
-	_, contains = c.Data[key]
+	_, contains = c.data[key]
 	return
 }
 
 func (c *Session) Get(name string) (value interface{}) {
-	value, _ = c.Data[name]
+	value, _ = c.data[name]
 	return
 }
 
 func (c *Session) Lookup(name string) (val interface{}, has bool) {
-	val, has = c.Data[name]
+	val, has = c.data[name]
 	return
 }
 
 // Set sets a key in the session
 func (c *Session) Set(name string, val interface{}) {
-	c.Data[name] = val
+	c.data[name] = val
 }
 
 // Unset deletes a key in the session map
 func (c *Session) Unset(keys ...string) {
 	for i := 0; i < len(keys); i++ {
-		delete(c.Data, keys[i])
+		delete(c.data, keys[i])
 	}
 }

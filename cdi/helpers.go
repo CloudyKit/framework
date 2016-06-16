@@ -42,7 +42,7 @@ type poolerProvider struct {
 	Value interface{}
 }
 
-func (pooler *poolerProvider) Provide(c *DI) interface{} {
+func (pooler *poolerProvider) Provide(c *Global) interface{} {
 	if pooler.Value != nil {
 		return pooler.Value
 	}
@@ -63,6 +63,6 @@ func (pp *ioCloserProvider) Finalize() {
 	closer.Close()
 }
 
-func (pp *ioCloserProvider) Provide(_ *DI) interface{} {
+func (pp *ioCloserProvider) Provide(_ *Global) interface{} {
 	return pp.Value
 }

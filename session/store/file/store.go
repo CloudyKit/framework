@@ -23,24 +23,38 @@ func New(directory string) store {
 	return store{directory}
 }
 
-func (store store) Reader(_ *cdi.DI, name string) (reader io.ReadCloser, err error) {
-	reader, err = os.Open(path.Join(store.BaseDir, name))
-	if err != nil && os.IsNotExist(err) {
+func (store store) Reader(_ *cdi.Global, name string, after time.Time) (reader io.ReadCloser, err error) {
+	var stat os.FileInfo
+	sessionFile := path.Join(store.BaseDir, name)
+	stat, err = os.Stat(sessionFile)
+
+	if err == nil {
+		if stat.ModTime().After(after) {
+			reader, err = os.Open(sessionFile)
+		} else {
+			os.Remove(sessionFile)
+		}
+		if err == nil {
+			return
+		}
+	}
+
+	if os.IsNotExist(err) {
 		err = nil
 	}
 	return
 }
 
-func (store store) Writer(_ *cdi.DI, name string) (writer io.WriteCloser, err error) {
+func (store store) Writer(_ *cdi.Global, name string) (writer io.WriteCloser, err error) {
 	writer, err = os.Create(path.Join(store.BaseDir, name))
 	return
 }
 
-func (store store) Remove(_ *cdi.DI, name string) error {
+func (store store) Remove(_ *cdi.Global, name string) error {
 	return os.Remove(path.Join(store.BaseDir, name))
 }
 
-func (store store) Gc(_ *cdi.DI, before time.Time) {
+func (store store) GC(_ *cdi.Global, before time.Time) {
 	files, err := ioutil.ReadDir(store.BaseDir)
 	if err != nil {
 		panic(err)

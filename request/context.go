@@ -2,91 +2,69 @@ package request
 
 import (
 	"github.com/CloudyKit/framework/cdi"
-	"github.com/CloudyKit/framework/validator"
 	"github.com/CloudyKit/router"
 
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"reflect"
-	"sync"
 )
 
 var ContextType = reflect.TypeOf((*Context)(nil))
 
-func Get(cdi *cdi.DI) *Context {
+// GetContext get's a Context from the Global context
+func GetContext(cdi *cdi.Global) *Context {
 	return cdi.Val4Type(ContextType).(*Context)
 }
 
+// Context holds context information about the incoming request
 type Context struct {
 	Name       string              // The name associated with the route
-	Global     *cdi.DI             // Dependency injection context
+	Global     *cdi.Global         // Dependency injection context
 	Request    *http.Request       // Request data passed by the router
 	Response   http.ResponseWriter // Response Writer passed by the router
 	Parameters router.Parameter    // Route Variables passed by the router
 }
 
-func (cc *Context) ValidateRoute(c func(validator.At)) validator.Result {
-	return validator.Run(validator.NewRouterValueProvider(cc.Parameters), c)
-}
-
-func (cc *Context) ValidateGet(c func(validator.At)) validator.Result {
-	return validator.Run(validator.NewRequestValueProvider(cc.Request), c)
-}
-
-func (cc *Context) ValidatePost(c func(validator.At)) validator.Result {
-	cc.Request.ParseForm()
-	return validator.Run(validator.NewURLValueProvider(cc.Request.PostForm), c)
-}
-
-func (cc *Context) JsonReadto(target interface{}) error {
-	return json.NewDecoder(cc.Request.Body).Decode(target)
-}
-
-func (cc *Context) JsonWritefrom(from interface{}) error {
-	return json.NewEncoder(cc.Response).Encode(from)
-}
-
+// WriteString writes the string txt into the the response
 func (cc *Context) WriteString(txt string) (int, error) {
 	return cc.Response.Write([]byte(txt))
 }
 
-func (cc *Context) Redirect(urlStr string) {
-	cc.RedirectCode(urlStr, http.StatusFound)
+// Redirect redirects the request to the specified urlStr and send a http StatusFound code
+func (c *Context) Redirect(urlStr string) {
+	c.RedirectStatus(urlStr, http.StatusFound)
 }
 
-func (cc *Context) RedirectCode(urlStr string, code int) {
-	http.Redirect(cc.Response, cc.Request, urlStr, code)
+// RedirectStatus redirects the request to the specified urlStr and send the the status code specified by httpStatus
+func (c *Context) RedirectStatus(urlStr string, httpStatus int) {
+	http.Redirect(c.Response, c.Request, urlStr, httpStatus)
 }
 
-func (cc *Context) Get(name string) string {
-	return cc.Request.Form.Get(name)
+// ParamByName returns a parameter from the url route, ParamByName is shortcut for Context.Parameters.ByName method
+func (cc *Context) ParamByName(name string) string {
+	return cc.Parameters.ByName(name)
 }
 
-func (cc *Context) Post(name string) string {
-	cc.Request.ParseForm()
+// FormByName  returns a form value from the request, FormByName is shortcut for Context.Request.Form.Get method
+func (cc *Context) FormByName(name string) string {
+	if cc.Request.PostForm == nil {
+		cc.Request.ParseForm()
+	}
 	return cc.Request.PostForm.Get(name)
 }
 
-func (cc *Context) Cookie(name string) (value string) {
+// URLFormByName  returns a form value from the request, FormByName is shortcut for Context.Request.Form.Get method
+func (cc *Context) URLFormByName(name string) string {
+	if cc.Request.Form == nil {
+		cc.Request.ParseForm()
+	}
+	return cc.Request.Form.Get(name)
+}
+
+// CookieByName returns a cookie value from the request
+func (cc *Context) CookieByName(name string) (value string) {
 	if cookie, _ := cc.Request.Cookie(name); cookie != nil {
 		value, _ = url.QueryUnescape(cookie.Value)
 	}
 	return
-}
-
-var contextPool = sync.Pool{
-	New: func() interface{} {
-		return new(Context)
-	},
-}
-
-func New(c Context) (cc *Context) {
-	cc = contextPool.Get().(*Context)
-	*cc = c
-	return
-}
-
-func (cc *Context) Finalize() {
-	contextPool.Put(cc)
 }

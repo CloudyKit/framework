@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-var DefaultSet = jet.NewHTMLSet("./views")
+var DefaultSet = jet.NewHTMLSet("./resources/views")
 
 func init() {
 	app.Default.Bootstrap(BootJet{DefaultSet})
@@ -20,15 +20,15 @@ type BootJet struct {
 
 var JetContextType = reflect.TypeOf((*JetContext)(nil))
 
-func GetJetContext(cdi *cdi.DI) *JetContext {
+func GetJetContext(cdi *cdi.Global) *JetContext {
 	return cdi.Val4Type(JetContextType).(*JetContext)
 }
 
 func (p BootJet) Bootstrap(a *app.App) {
-	a.Global.MapType(JetContextType, func(cdi *cdi.DI) interface{} {
+	a.Global.MapType(JetContextType, func(cdi *cdi.Global) interface{} {
 		cc := &JetContext{
 			set:      p.Set,
-			rcontext: request.Get(cdi),
+			rcontext: request.GetContext(cdi),
 		}
 		for key, value := range cdi.Get(Globals(nil)).(Globals) {
 			cc.With(key, value.Provide(cdi))
@@ -45,16 +45,12 @@ type JetContext struct {
 	global   Globals
 }
 
-func (c *JetContext) Render(templateName string, context interface{}) *JetContext {
+func (c *JetContext) Render(templateName string, context interface{}) error {
 	t, err := c.set.LoadTemplate(templateName, "")
 	if err != nil {
-		panic(err)
+		return err
 	}
-	err = t.Execute(c.rcontext.Response, c.scope, context)
-	if err != nil {
-		panic(err)
-	}
-	return c
+	return t.Execute(c.rcontext.Response, c.scope, context)
 }
 
 func (c *JetContext) WithValue(name string, v reflect.Value) *JetContext {

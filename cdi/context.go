@@ -1,6 +1,7 @@
 package cdi
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -8,8 +9,8 @@ import (
 )
 
 type (
-	DI struct {
-		parent     *DI
+	Global struct {
+		parent     *Global
 		references int64
 		values     map[reflect.Type]interface{}
 	}
@@ -19,18 +20,18 @@ type (
 	}
 
 	provider interface {
-		Provide(c *DI) interface{}
+		Provide(c *Global) interface{}
 	}
 
-	providerSetter interface {
-		Provide(c *DI, field reflect.Value)
+	setter interface {
+		Provide(c *Global, field reflect.Value)
 	}
 )
 
 var (
 	pool = sync.Pool{
 		New: func() interface{} {
-			cc := new(DI)
+			cc := new(Global)
 			cc.values = make(map[reflect.Type]interface{})
 			return cc
 		},
@@ -66,15 +67,16 @@ func Walkable(v ...interface{}) uint {
 }
 
 // New creates a new instance of context object
-func New() (cc *DI) {
-	cc = pool.Get().(*DI)
+func New() (cc *Global) {
+	cc = pool.Get().(*Global)
+	cc.references = 0
 	return
 }
 
 // Context holds the dependency injection data
 
 // Inject walks the target looking the for exported fields that types match injectable types in Global
-func (c *DI) Inject(target interface{}) {
+func (c *Global) Inject(target interface{}) {
 	value := reflect.ValueOf(target)
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
@@ -82,8 +84,10 @@ func (c *DI) Inject(target interface{}) {
 	c.InjectInStructValue(value)
 }
 
+var cdiType = reflect.TypeOf((*Global)(nil))
+
 // InjectInStructValue walks the struct value looking to injectable fields
-func (c *DI) InjectInStructValue(value reflect.Value) {
+func (c *Global) InjectInStructValue(value reflect.Value) {
 	if value.Kind() != reflect.Struct {
 		panic("Invalid value passed to inject, required kind is struct get " + value.Kind().String())
 	}
@@ -96,22 +100,21 @@ func (c *DI) InjectInStructValue(value reflect.Value) {
 			if !wasSetted {
 				field.Set(reflect.ValueOf(provided_value))
 			}
-			continue
-		}
-
-		if _, ok := walkableFields[fieldTyp]; ok {
+		} else if cdiType == fieldTyp {
+			field.Set(reflect.ValueOf(c))
+		} else if _, ok := walkableFields[fieldTyp]; ok {
 			c.InjectInStructValue(field)
 		}
 	}
 }
 
 // Set sets a provider for the type of typ with value of val
-func (c *DI) MapType(typOf reflect.Type, val interface{}) {
+func (c *Global) MapType(typOf reflect.Type, val interface{}) {
 	c.values[typOf] = val
 }
 
 // Put puts the list of values into the current context
-func (c *DI) Map(value ...interface{}) {
+func (c *Global) Map(value ...interface{}) {
 	for i := 0; i < len(value); i++ {
 		vof := value[i]
 		v := reflect.ValueOf(vof)
@@ -119,46 +122,20 @@ func (c *DI) Map(value ...interface{}) {
 	}
 }
 
-// From put in to the context all child values from the provided value
-// example all exported fields from a Struct or itens from a Slice
-func (c *DI) From(st interface{}) {
-	v := reflect.ValueOf(st)
-RESTART:
-	switch v.Kind() {
-	case reflect.Ptr:
-		v = v.Elem()
-		goto RESTART
-	case reflect.Slice:
-		length := v.Len()
-		for i := 0; i < length; i++ {
-			field := v.Index(i)
-			if field.CanInterface() {
-				c.values[field.Type()] = field.Interface()
-			}
-		}
-	case reflect.Struct:
-		numFields := v.NumField()
-		for i := 0; i < numFields; i++ {
-			field := v.Field(i)
-			if field.CanInterface() {
-				c.values[field.Type()] = field.Interface()
-			}
-		}
-	default:
-		panic("Invalid kind")
-	}
-}
-
 // Child creates a new context using current values repository as provider for the new context
-func (c *DI) Child() (child *DI) {
-	c.references = atomic.AddInt64(&c.references, 1)
-	child = New()
-	child.parent = c
+func (c *Global) Child() (child *Global) {
+	if atomic.LoadInt64(&c.references) > -1 {
+		c.references = atomic.AddInt64(&c.references, 1)
+		child = New()
+		child.parent = c
+	} else {
+		panic(errors.New("Invoking Child in a context already recycled"))
+	}
 	return
 }
 
 // val4type walkings the context from the current to the top parent looking for the value with type typ
-func (_context *DI) val4type(typ reflect.Type) (val interface{}) {
+func (_context *Global) val4type(typ reflect.Type) (val interface{}) {
 	for {
 		val = _context.values[typ]
 		if val != nil || _context.parent == nil {
@@ -170,17 +147,17 @@ func (_context *DI) val4type(typ reflect.Type) (val interface{}) {
 }
 
 // val4TypeField returns a value for the specified type typ
-func (c *DI) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}, ok bool) {
+func (c *Global) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}, ok bool) {
 	val = c.val4type(typ)
 	switch provider := val.(type) {
-	case func(*DI) interface{}:
+	case func(*Global) interface{}:
 		val = provider(c)
-	case func(*DI, reflect.Value):
+	case func(*Global, reflect.Value):
 		provider(c, valOf)
 		ok = true
 	case provider:
 		val = provider.Provide(c)
-	case providerSetter:
+	case setter:
 		provider.Provide(c, valOf)
 		ok = true
 	}
@@ -188,23 +165,32 @@ func (c *DI) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface
 }
 
 // Val4Type returns a value for the specified type typ
-func (c *DI) Val4Type(typ reflect.Type) (val interface{}) {
+func (c *Global) Val4Type(typ reflect.Type) (val interface{}) {
 	val = c.val4type(typ)
-	if valFn, ok := val.(func(*DI) interface{}); ok {
-		val = valFn(c)
-	} else if _provider, isProvider := val.(provider); isProvider {
-		val = _provider.Provide(c)
+	switch provider := val.(type) {
+	case func(*Global) interface{}:
+		val = provider(c)
+	case func(*Global, reflect.Value):
+		valOf := reflect.New(typ).Elem()
+		provider(c, valOf)
+		val = valOf.Interface()
+	case provider:
+		val = provider.Provide(c)
+	case setter:
+		valOf := reflect.New(typ).Elem()
+		provider.Provide(c, valOf)
+		val = valOf.Interface()
 	}
 	return
 }
 
 // Get returns a value for the type of typ
-func (c *DI) Get(typ interface{}) interface{} {
+func (c *Global) Get(typ interface{}) interface{} {
 	return c.Val4Type(reflect.TypeOf(typ))
 }
 
 // Done should be called when the context is not being used anymore
-func (c *DI) Done() {
+func (c *Global) Done() int64 {
 	// check if this is the last active reference
 	c.references = atomic.AddInt64(&c.references, -1)
 
@@ -213,17 +199,31 @@ func (c *DI) Done() {
 	} else if c.references < -1 {
 		panic(fmt.Errorf("Inválid reference counting expected value is -1 got %v", c.references))
 	}
+	return c.references
+}
+
+var err = errors.New("Done4C requested that at this point all references to this context are previous cleared")
+
+func (c *Global) Done4C() {
+	if c.Done() > -1 {
+		panic(err)
+	}
+}
+
+func (c *Global) recycle() {
+	if c.parent != nil {
+		c.parent.Done()
+		c.parent = nil
+	}
+	pool.Put(c)
 }
 
 // finalize walks all values in the current context and invokes finalizers
 // decrease reference counter into the parent
 // and recycle the private data
-func (c *DI) finalize() {
+func (c *Global) finalize() {
 	// invokes parent Done method
-	if c.parent != nil {
-		defer c.parent.Done()
-	}
-
+	defer c.recycle()
 	//runs recycle here
 	for _typ, _val := range c.values {
 		// not delete the keys
@@ -232,7 +232,4 @@ func (c *DI) finalize() {
 			_finalizer.Finalize()
 		}
 	}
-	c.references = 0
-	c.parent = nil
-	pool.Put(c)
 }

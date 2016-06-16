@@ -2,7 +2,6 @@ package validator
 
 import (
 	"github.com/CloudyKit/router"
-	"net/http"
 	"net/url"
 	"reflect"
 )
@@ -13,12 +12,6 @@ type Provider func(i string) reflect.Value
 func NewURLValueProvider(vl url.Values) Provider {
 	return func(name string) reflect.Value {
 		return reflect.ValueOf(vl.Get(name))
-	}
-}
-
-func NewRequestValueProvider(vl *http.Request) Provider {
-	return func(name string) reflect.Value {
-		return reflect.ValueOf(vl.FormValue(name))
 	}
 }
 
@@ -43,6 +36,15 @@ func (err Result) Accepted() bool {
 
 func (err Result) Rejected() bool {
 	return len(err) > 0
+}
+
+func (m Result) Get(fieldName string) Error {
+	for _, err := range m {
+		if err.Field == fieldName {
+			return err
+		}
+	}
+	return Error{}
 }
 
 type Context struct {

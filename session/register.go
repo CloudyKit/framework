@@ -13,7 +13,7 @@ var (
 	rwMx          = sync.Mutex{}
 )
 
-func persistPtr(typOf reflect.Type, c *cdi.DI, mapto string) {
+func persistPtr(typOf reflect.Type, c *cdi.Global, mapto string) {
 	structTyp := typOf.Elem()
 
 	if structTyp.Kind() != reflect.Struct {
@@ -21,21 +21,21 @@ func persistPtr(typOf reflect.Type, c *cdi.DI, mapto string) {
 	}
 
 	sessionsTypes[typOf] = mapto
-	c.MapType(typOf, func(c *cdi.DI) (ret interface{}) {
-		sess := Get(c)
+	c.MapType(typOf, func(c *cdi.Global) (ret interface{}) {
+		sess := GetSession(c)
 		ret = sess.Get(mapto)
 		if ret == nil {
 			ret = reflect.New(structTyp).Interface()
 			sess.Set(mapto, ret)
 		}
-		c.Map(ret)
+		c.MapType(typOf, ret)
 		return
 	})
 }
 
-func persistStruct(typOf reflect.Type, c *cdi.DI, mapto string) {
-	c.MapType(typOf, func(c *cdi.DI, t reflect.Value) {
-		sess := Get(c)
+func persistStruct(typOf reflect.Type, c *cdi.Global, mapto string) {
+	c.MapType(typOf, func(c *cdi.Global, t reflect.Value) {
+		sess := GetSession(c)
 		val := sess.Get(mapto)
 		if val != nil {
 			valueOf := reflect.ValueOf(val)
@@ -48,11 +48,11 @@ func persistStruct(typOf reflect.Type, c *cdi.DI, mapto string) {
 	})
 }
 
-func Persist(c *cdi.DI, i interface{}) error {
+func Persist(c *cdi.Global, i interface{}) error {
 	return PersistKey(c, "", i)
 }
 
-func PersistKey(c *cdi.DI, key string, i interface{}) error {
+func PersistKey(c *cdi.Global, key string, i interface{}) error {
 	rwMx.Lock()
 	defer rwMx.Unlock()
 	typOf := reflect.TypeOf(i)

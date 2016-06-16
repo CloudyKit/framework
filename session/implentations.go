@@ -15,15 +15,15 @@ type IdGenerator interface {
 }
 
 type Serializer interface {
-	Serialize(src interface{}, w io.Writer) error
-	Unserialize(dst interface{}, r io.Reader) error
+	Serialize(session interface{}, w io.Writer) error
+	Unserialize(session interface{}, r io.Reader) error
 }
 
 type Store interface {
-	Reader(c *cdi.DI, name string) (io.ReadCloser, error)
-	Writer(c *cdi.DI, name string) (io.WriteCloser, error)
-	Remove(c *cdi.DI, name string) error
-	Gc(c *cdi.DI, before time.Time)
+	Reader(c *cdi.Global, name string, after time.Time) (io.ReadCloser, error)
+	Writer(c *cdi.Global, name string) (io.WriteCloser, error)
+	Remove(c *cdi.Global, name string) error
+	GC(c *cdi.Global, before time.Time)
 }
 
 type RandGenerator struct{}

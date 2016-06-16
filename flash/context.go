@@ -10,7 +10,7 @@ import (
 
 func init() {
 	gob.Register((map[string]interface{})(nil))
-	app.Default.Bootstrap(Boot{Session{defaultKey}})
+	app.Default.Bootstrap(&Boot{Session{defaultKey}})
 }
 
 type Store interface {
@@ -25,12 +25,17 @@ type Flasher struct {
 	context   *request.Context
 }
 
+func (c *Flasher) CountMessages() int {
+	return len(c.Data)
+}
+
 func (c *Flasher) Reflash(keys ...string) {
 	for i := 0; i < len(keys); i++ {
 		if val, has := c.Data[keys[i]]; has {
 			c.writeData[keys[i]] = val
 		}
 	}
+
 }
 
 func (c *Flasher) Get(key string) interface{} {
@@ -60,13 +65,13 @@ type Boot struct {
 
 var FlasherType = reflect.TypeOf((*Flasher)(nil))
 
-func Get(cdi *cdi.DI) *Flasher {
-	return cdi.Val4Type(cdi).(*Flasher)
+func GetFlasher(cdi *cdi.Global) *Flasher {
+	return cdi.Val4Type(FlasherType).(*Flasher)
 }
 
 type flasher Flasher
 
-func (f *flasher) Finalize() {
+func (f *flasher) finalize() {
 	if f.writeData != nil {
 		err := f.store.Save(f.context, f.writeData)
 		if err != nil {
@@ -75,20 +80,21 @@ func (f *flasher) Finalize() {
 	}
 }
 
-func (f *flasher) Provide(cdi *cdi.DI) interface{} {
+func (f *flasher) Provide(cdi *cdi.Global) interface{} {
 	return (*Flasher)(f)
 }
 
 func (p *Boot) Bootstrap(a *app.App) {
 
-	a.Global.MapType(FlasherType, func(c *cdi.DI) interface{} {
+	a.Root().AddFilter(func(c *request.Context, f request.Flow) {
 		readData, err := p.Read(c)
 		if err != nil {
 			panic(err)
 		}
-		cc := &flasher{Data: readData, store: p.Store, context: request.Get(c)}
-		c.MapType(FlasherType, cc)
-		return (*Flasher)(cc)
+		cc := &flasher{Data: readData, store: p.Store, context: c}
+		c.Global.MapType(FlasherType, cc)
+		f.Continue()
+		defer cc.finalize()
 	})
 
 }

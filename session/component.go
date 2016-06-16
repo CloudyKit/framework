@@ -1,0 +1,75 @@
+package session
+
+import (
+	"github.com/CloudyKit/framework/app"
+	"github.com/CloudyKit/framework/cdi"
+	"github.com/CloudyKit/framework/request"
+	"log"
+	"net/http"
+	"reflect"
+)
+
+type Boot struct {
+	CookieOptions *CookieOptions
+	Manager       *Manager
+}
+
+var (
+	SessionType = reflect.TypeOf((*Session)(nil))
+)
+
+func GetSession(cdi *cdi.Global) *Session {
+	return cdi.Val4Type(SessionType).(*Session)
+}
+
+func (sp *Boot) Bootstrap(a *app.App) {
+
+	app.Get(a.Global).AddFilter(func(c *request.Context, f request.Flow) {
+		s := _sessionPool.Get().(*Session)
+		s.data = make(SessionData)
+		c.Global.MapType(SessionType, s)
+		if readedcookie, _ := c.Request.Cookie(sp.CookieOptions.Name); readedcookie == nil {
+			s.ID = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
+		} else {
+			s.ID = sp.Manager.Generator.Generate(readedcookie.Value, sp.CookieOptions.Name)
+			if s.ID != readedcookie.Value {
+				sp.Manager.Remove(c.Global, readedcookie.Value)
+			}
+			err := sp.Manager.Open(c.Global, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
+			if err != nil {
+				log.Println("Session read err:", err.Error())
+			}
+		}
+
+		// resets the cookie
+		http.SetCookie(c.Response, &http.Cookie{
+			Name:     sp.CookieOptions.Name,
+			Value:    s.ID,
+			Path:     sp.CookieOptions.Path,
+			Domain:   sp.CookieOptions.Domain,
+			Secure:   sp.CookieOptions.Secure,
+			HttpOnly: sp.CookieOptions.HttpOnly,
+			MaxAge:   sp.CookieOptions.MaxAge,
+			Expires:  sp.CookieOptions.Expires,
+		})
+
+		f.Continue()
+
+		for sesskey, sessvalue := range s.data {
+			of := reflect.ValueOf(sessvalue)
+			switch of.Kind() {
+			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.UnsafePointer, reflect.Slice, reflect.Ptr:
+				if of.IsNil() {
+					delete(s.data, sesskey)
+				}
+			}
+		}
+
+		err := sp.Manager.Save(c.Global, s.ID, s.data)
+		_sessionPool.Put(s)
+
+		if err != nil {
+			log.Println("Session write err:", err.Error())
+		}
+	})
+}

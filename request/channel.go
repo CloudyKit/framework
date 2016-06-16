@@ -4,13 +4,15 @@ import (
 	"errors"
 )
 
-func NewContextChain(r *Context, handler Handler, filters []func(*Context, Flow)) Flow {
+func NewRequestFlow(r *Context, handler Handler, filters []Filter) Flow {
 	return Flow{context: r, handler: handler, filters: filters}
 }
 
+type Filter func(*Context, Flow)
+
 type Flow struct {
 	context *Context
-	filters []func(*Context, Flow)
+	filters []Filter
 	handler Handler
 }
 
