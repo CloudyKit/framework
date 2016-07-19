@@ -31,7 +31,7 @@ type contextProvider struct {
 }
 
 func (v contextProvider) Provide(c *cdi.Global) interface{} {
-	return c.Val4Type(v.typeof)
+	return c.GetByType(v.typeof)
 }
 
 type Globals map[string]provider
@@ -44,7 +44,7 @@ func GlobalName(ci *cdi.Global, name string, v interface{}) error {
 }
 
 func globalNameProvider(ci *cdi.Global, name string, v provider) error {
-	globals := ci.Get(Globals(nil)).(Globals)
+	globals := ci.GetByPtr(Globals(nil)).(Globals)
 	globals[name] = v
 	return nil
 }

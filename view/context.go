@@ -11,26 +11,41 @@ import (
 var DefaultSet = jet.NewHTMLSet("./resources/views")
 
 func init() {
-	app.Default.Bootstrap(BootJet{DefaultSet})
+	app.Default.Bootstrap(JetComponent{DefaultSet})
 }
 
-type BootJet struct {
+type JetComponent struct {
 	Set *jet.Set
 }
 
 var JetContextType = reflect.TypeOf((*JetContext)(nil))
 
 func GetJetContext(cdi *cdi.Global) *JetContext {
-	return cdi.Val4Type(JetContextType).(*JetContext)
+	c, _ := cdi.GetByType(JetContextType).(*JetContext)
+	return c
 }
 
-func (p BootJet) Bootstrap(a *app.App) {
+func Render(global *cdi.Global, viewName string, c interface{}) {
+	GetJetContext(global).Render(viewName, c)
+}
+
+var JetSetType = reflect.TypeOf((*jet.Set)(nil))
+
+func GetJetSet(cdi *cdi.Global) *jet.Set {
+	c, _ := cdi.GetByType(JetSetType).(*jet.Set)
+	return c
+}
+
+func (p JetComponent) Bootstrap(a *app.App) {
+
+	a.Global.MapType(JetSetType, p.Set)
+
 	a.Global.MapType(JetContextType, func(cdi *cdi.Global) interface{} {
 		cc := &JetContext{
 			set:      p.Set,
 			rcontext: request.GetContext(cdi),
 		}
-		for key, value := range cdi.Get(Globals(nil)).(Globals) {
+		for key, value := range cdi.GetByPtr(Globals(nil)).(Globals) {
 			cc.With(key, value.Provide(cdi))
 		}
 		cdi.MapType(JetContextType, cc)
@@ -45,11 +60,25 @@ type JetContext struct {
 	global   Globals
 }
 
-func (c *JetContext) Render(templateName string, context interface{}) error {
-	t, err := c.set.LoadTemplate(templateName, "")
+func (s *JetContext) JetSet() *jet.Set {
+	return s.set
+}
+
+func (c *JetContext) render(templateName string, context interface{}) error {
+	t, err := c.set.GetTemplate(templateName)
 	if err != nil {
 		return err
 	}
+	return t.Execute(c.rcontext.Response, c.scope, context)
+}
+
+func (c *JetContext) Render(templateName string, context interface{}) {
+	if err := c.render(templateName, context); err != nil {
+		panic(err)
+	}
+}
+
+func (c *JetContext) Execute(t *jet.Template, context interface{}) error {
 	return t.Execute(c.rcontext.Response, c.scope, context)
 }
 

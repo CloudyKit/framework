@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
+	"github.com/CloudyKit/framework/events"
 	"github.com/CloudyKit/framework/request"
 	"reflect"
 	"regexp"
@@ -20,6 +21,8 @@ type (
 		app    *App
 		Global *cdi.Global
 
+		*ctlGen
+		emitter
 		filterManager
 	}
 
@@ -35,7 +38,7 @@ type (
 	}
 )
 
-func (app *App) AddController(controllers ...appContext) {
+func (app *App) BindControllers(controllers ...appContext) {
 	for i := 0; i < len(controllers); i++ {
 		controller := controllers[i]
 
@@ -52,21 +55,28 @@ func (app *App) AddController(controllers ...appContext) {
 		name := structTyp.String()
 
 		// creates a new di for this controller
-		newDi := app.Global.Child()
+		newDi := app.Global.Inherit()
+
 		// creates a new cascade url generator
 		myGen := new(ctlGen)
 		// injects parent url generator
 		newDi.Inject(myGen)
-
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
 		newDi.MapType(common.URLerType, myGen)
 
+		emitter := app.emitter.(*events.Emitter)
+		newDi.MapType(events.EmitterType, func(c *cdi.Global) interface{} {
+			return emitter.Inherit()
+		})
+
 		controller.Mx(&Mapper{
 			name:      name,
 			app:       app,
 			typ:       ptrTyp,
+			ctlGen:    myGen,
+			emitter:   app.emitter,
 			Global:    newDi,
 			zeroValue: zero,
 			pool: &sync.Pool{
@@ -98,7 +108,7 @@ func (handler *contextHandler) Handle(c *request.Context) {
 
 var acRegex = regexp.MustCompile("/[:*][^/]+")
 
-func (mx *Mapper) AddHandler(method, path, action string, filters ...request.Filter) {
+func (mx *Mapper) BindAction(method, path, action string, filters ...request.Filter) {
 	methodByName, isPtr := mx.typ.MethodByName(action)
 	if !isPtr {
 		methodByName, _ = mx.typ.Elem().MethodByName(action)

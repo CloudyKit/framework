@@ -26,7 +26,7 @@ func TestDiProvideAndInject(t *testing.T) {
 	}
 
 	// creates a child context
-	newChildContext := newContext.Child()
+	newChildContext := newContext.Inherit()
 	defer newChildContext.Done()
 
 	// reset tt value
@@ -52,7 +52,7 @@ func TestDiDone(t *testing.T) {
 	if context.references != 0 {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
-	var childContext = context.Child()
+	var childContext = context.Inherit()
 	if context.references != 1 {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
@@ -71,6 +71,22 @@ func TestDiDone(t *testing.T) {
 	context.Done()
 	if context.parent != nil {
 		t.Fatal("Inválid reference counting ", context.references)
+	}
+
+}
+
+func TestGlobal_Checkpoint(t *testing.T) {
+	var context = New()
+	var contextcopy = context
+	(func() {
+		defer Checkpoint(&context)()
+		if context == contextcopy {
+			t.Fail()
+		}
+	})()
+
+	if context != contextcopy {
+		t.Fail()
 	}
 }
 
@@ -91,7 +107,7 @@ func BenchmarkInjectChild(b *testing.B) {
 		*testing.B
 	}
 	for i := 0; i < b.N; i++ {
-		context := context.Child()
+		context := context.Inherit()
 		context.Map(b)
 		context.Inject(&tt)
 		context.Done()

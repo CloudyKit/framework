@@ -7,7 +7,7 @@ import (
 
 // BindGetForm decodes the request url values into target
 func (c *Context) BindGetForm(target interface{}) error {
-	if c.Request.PostForm == nil {
+	if c.Request.Form == nil {
 		c.Request.ParseForm()
 	}
 	return formam.Decode(c.Request.Form, target)

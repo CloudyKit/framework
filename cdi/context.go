@@ -73,9 +73,7 @@ func New() (cc *Global) {
 	return
 }
 
-// Context holds the dependency injection data
-
-// Inject walks the target looking the for exported fields that types match injectable types in Global
+//Inject walks the target looking the for exported fields that types match injectable types in Global
 func (c *Global) Inject(target interface{}) {
 	value := reflect.ValueOf(target)
 	if value.Kind() == reflect.Ptr {
@@ -86,7 +84,7 @@ func (c *Global) Inject(target interface{}) {
 
 var cdiType = reflect.TypeOf((*Global)(nil))
 
-// InjectInStructValue walks the struct value looking to injectable fields
+//InjectInStructValue walks the struct value looking to injectable fields
 func (c *Global) InjectInStructValue(value reflect.Value) {
 	if value.Kind() != reflect.Struct {
 		panic("Invalid value passed to inject, required kind is struct get " + value.Kind().String())
@@ -96,7 +94,7 @@ func (c *Global) InjectInStructValue(value reflect.Value) {
 		field := value.Field(i)
 		fieldTyp := field.Type()
 
-		if provided_value, wasSetted := c.val4TypeField(fieldTyp, field); provided_value != nil || wasSetted {
+		if provided_value, wasSetted := c.getByTypeField(fieldTyp, field); provided_value != nil || wasSetted {
 			if !wasSetted {
 				field.Set(reflect.ValueOf(provided_value))
 			}
@@ -108,12 +106,12 @@ func (c *Global) InjectInStructValue(value reflect.Value) {
 	}
 }
 
-// Set sets a provider for the type of typ with value of val
+//MapType sets a provider for the type of typ with value of val
 func (c *Global) MapType(typOf reflect.Type, val interface{}) {
 	c.values[typOf] = val
 }
 
-// Put puts the list of values into the current context
+//Map puts the list of values into the current context
 func (c *Global) Map(value ...interface{}) {
 	for i := 0; i < len(value); i++ {
 		vof := value[i]
@@ -122,8 +120,8 @@ func (c *Global) Map(value ...interface{}) {
 	}
 }
 
-// Child creates a new context using current values repository as provider for the new context
-func (c *Global) Child() (child *Global) {
+//Inherit creates a new context using current values repository as provider for the new context
+func (c *Global) Inherit() (child *Global) {
 	if atomic.LoadInt64(&c.references) > -1 {
 		c.references = atomic.AddInt64(&c.references, 1)
 		child = New()
@@ -134,8 +132,8 @@ func (c *Global) Child() (child *Global) {
 	return
 }
 
-// val4type walkings the context from the current to the top parent looking for the value with type typ
-func (_context *Global) val4type(typ reflect.Type) (val interface{}) {
+//getByType searchs for value of type typ, walking the context tree from the current to the top parent looking for the value with type typ
+func (_context *Global) getByType(typ reflect.Type) (val interface{}) {
 	for {
 		val = _context.values[typ]
 		if val != nil || _context.parent == nil {
@@ -146,9 +144,9 @@ func (_context *Global) val4type(typ reflect.Type) (val interface{}) {
 	return
 }
 
-// val4TypeField returns a value for the specified type typ
-func (c *Global) val4TypeField(typ reflect.Type, valOf reflect.Value) (val interface{}, ok bool) {
-	val = c.val4type(typ)
+//getByTypeField returns a value for the specified type typ
+func (c *Global) getByTypeField(typ reflect.Type, valOf reflect.Value) (val interface{}, ok bool) {
+	val = c.getByType(typ)
 	switch provider := val.(type) {
 	case func(*Global) interface{}:
 		val = provider(c)
@@ -164,9 +162,9 @@ func (c *Global) val4TypeField(typ reflect.Type, valOf reflect.Value) (val inter
 	return
 }
 
-// Val4Type returns a value for the specified type typ
-func (c *Global) Val4Type(typ reflect.Type) (val interface{}) {
-	val = c.val4type(typ)
+//GetByType returns a value for the specified type typ
+func (c *Global) GetByType(typ reflect.Type) (val interface{}) {
+	val = c.getByType(typ)
 	switch provider := val.(type) {
 	case func(*Global) interface{}:
 		val = provider(c)
@@ -184,9 +182,9 @@ func (c *Global) Val4Type(typ reflect.Type) (val interface{}) {
 	return
 }
 
-// Get returns a value for the type of typ
-func (c *Global) Get(typ interface{}) interface{} {
-	return c.Val4Type(reflect.TypeOf(typ))
+//GetByPtr searches a value which has same typ that typ points to and returns the value from the context tree
+func (c *Global) GetByPtr(typ interface{}) interface{} {
+	return c.GetByType(reflect.TypeOf(typ))
 }
 
 // Done should be called when the context is not being used anymore
@@ -231,5 +229,14 @@ func (c *Global) finalize() {
 		if _finalizer, isFinalizer := _val.(finalizer); isFinalizer {
 			_finalizer.Finalize()
 		}
+	}
+}
+
+func Checkpoint(c **Global) func() {
+	*c = (*c).Inherit()
+	return func() {
+		cc := (*c)
+		*c = cc.parent
+		cc.Done()
 	}
 }

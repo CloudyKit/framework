@@ -6,6 +6,7 @@ import (
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/router"
 
+	"github.com/CloudyKit/framework/events"
 	"net/http"
 	"os"
 	"reflect"
@@ -16,20 +17,22 @@ import (
 var AppType = reflect.TypeOf((*App)(nil))
 
 func Get(c *cdi.Global) *App {
-	return c.Val4Type(AppType).(*App)
+	return c.GetByType(AppType).(*App)
 }
 
 var Default = New()
 
 func New() *App {
-	newApp := &App{Global: cdi.New(), Router: router.New(), urlGen: make(urlGen)}
+	_app := &App{Global: cdi.New(), Router: router.New(), urlGen: make(urlGen), emitter: events.NewEmitter()}
+
 	// provide application urlGen as URLer
-	newApp.Global.MapType(common.URLerType, newApp.urlGen)
+	_app.Global.MapType(common.URLerType, _app.urlGen)
 	// provide the Router
-	newApp.Global.Map(newApp.Router)
+	_app.Global.Map(_app.Router)
 	// provide the app
-	newApp.Global.MapType(AppType, newApp)
-	return newApp
+	_app.Global.MapType(AppType, _app)
+	_app.Global.MapType(events.EmitterType, _app.emitter)
+	return _app
 }
 
 type filterManager struct {
@@ -51,7 +54,14 @@ func (f *filterManager) reslice(filters ...request.Filter) []request.Filter {
 	return f.filters[0:len(f.filters)]
 }
 
+type emitter interface {
+	Subscribe(groups string, handler interface{}) *events.Emitter
+	Emit(groupName, key string, context interface{}) (canceled bool, err error)
+}
+
 type App struct {
+	emitter
+
 	Global *cdi.Global    // App Global dependency injection context
 	Router *router.Router // Router
 	Prefix string         // Prefix prefix for path added in this app
@@ -69,6 +79,15 @@ func (app *App) Root() *App {
 	return Get(app.Global)
 }
 
+func (app *App) Snapshot() *App {
+	_app := *app
+
+	_app.Global = app.Global.Inherit()
+	_app.Global.MapType(AppType, _app)
+
+	return &_app
+}
+
 type ComponentFunc func(*App)
 
 func (component ComponentFunc) Bootstrap(a *App) {
@@ -77,7 +96,7 @@ func (component ComponentFunc) Bootstrap(a *App) {
 
 // Bootstrap bootstrap a list of components, Bootstrap will created a child CDI context used
 func (app App) Bootstrap(b ...Component) {
-	c := app.Global.Child()
+	c := app.Global.Inherit()
 	defer c.Done4C() // require 0 references at this point
 
 	for i := 0; i < len(b); i++ {
@@ -129,7 +148,7 @@ func (app *App) AddHandlerContextName(context *cdi.Global, name, method, path st
 	for _, method := range strings.Split(method, "|") {
 		app.Router.AddRoute(method, app.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 
-			c := newContext(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Global: context.Child()})
+			c := newContext(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Global: context.Inherit()})
 			defer func() {
 				global := c.Global
 				contextPool.Put(c)
@@ -156,10 +175,12 @@ func (app *App) host(host string) (servein string) {
 }
 
 func (app *App) RunServer(host string) error {
+	app.Emit("app.run", host, app)
 	return http.ListenAndServe(host, app.Router)
 }
 
 func (app *App) RunServerTls(host, certfile, keyfile string) error {
+	app.Emit("app.run.tls", host, app)
 	return http.ListenAndServeTLS(app.host(host), certfile, keyfile, app.Router)
 }
 

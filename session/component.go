@@ -19,20 +19,31 @@ var (
 )
 
 func GetSession(cdi *cdi.Global) *Session {
-	return cdi.Val4Type(SessionType).(*Session)
+	return cdi.GetByType(SessionType).(*Session)
 }
 
 func (sp *Boot) Bootstrap(a *app.App) {
 
+	if sp.CookieOptions == nil {
+		sp.CookieOptions = &CookieOptions{
+			Name: "__gsid",
+			Path: "/",
+		}
+	} else {
+		if sp.CookieOptions.Path == "" {
+			sp.CookieOptions.Path = "/"
+		}
+	}
+
 	app.Get(a.Global).AddFilter(func(c *request.Context, f request.Flow) {
 		s := _sessionPool.Get().(*Session)
-		s.data = make(SessionData)
+		s.data = make(sessionData)
 		c.Global.MapType(SessionType, s)
 		if readedcookie, _ := c.Request.Cookie(sp.CookieOptions.Name); readedcookie == nil {
-			s.ID = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
+			s._id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
-			s.ID = sp.Manager.Generator.Generate(readedcookie.Value, sp.CookieOptions.Name)
-			if s.ID != readedcookie.Value {
+			s._id = sp.Manager.Generator.Generate(readedcookie.Value, sp.CookieOptions.Name)
+			if s._id != readedcookie.Value {
 				sp.Manager.Remove(c.Global, readedcookie.Value)
 			}
 			err := sp.Manager.Open(c.Global, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
@@ -44,7 +55,7 @@ func (sp *Boot) Bootstrap(a *app.App) {
 		// resets the cookie
 		http.SetCookie(c.Response, &http.Cookie{
 			Name:     sp.CookieOptions.Name,
-			Value:    s.ID,
+			Value:    s._id,
 			Path:     sp.CookieOptions.Path,
 			Domain:   sp.CookieOptions.Domain,
 			Secure:   sp.CookieOptions.Secure,
@@ -65,7 +76,7 @@ func (sp *Boot) Bootstrap(a *app.App) {
 			}
 		}
 
-		err := sp.Manager.Save(c.Global, s.ID, s.data)
+		err := sp.Manager.Save(c.Global, s._id, s.data)
 		_sessionPool.Put(s)
 
 		if err != nil {

@@ -23,11 +23,13 @@ var (
 )
 
 func init() {
-	gob.Register(SessionData(nil))
+	gob.Register(sessionData(nil))
 	app.Default.Bootstrap(&Boot{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
 }
 
+//New returns a new session
 func New(gcEvery time.Duration, duration time.Duration, store Store, serializer Serializer, generator IdGenerator) *Manager {
+
 	manager := &Manager{
 		Generator:  generator,
 		gcEvery:    gcEvery,
@@ -36,20 +38,24 @@ func New(gcEvery time.Duration, duration time.Duration, store Store, serializer 
 		Serializer: serializer,
 	}
 
-	manager.donechan = make(chan *mJob)
-	manager.workchan = make(chan *mJob)
-
+	//collect expired sessions
 	manager.Store.GC(manager.Global, time.Now().Add(-manager.Duration))
 
-	go manager.work()
+	//starts the garbage collect goroutine
+	go manager.gcgoroutine()
+
 	return manager
 }
 
-type SessionData map[string]interface{}
+type sessionData map[string]interface{}
 
 type Session struct {
-	ID   string
-	data SessionData
+	_id  string
+	data sessionData
+}
+
+func (c *Session) ID() string {
+	return c._id
 }
 
 func (c *Session) Contains(key string) (contains bool) {
@@ -62,8 +68,8 @@ func (c *Session) Get(name string) (value interface{}) {
 	return
 }
 
-func (c *Session) Lookup(name string) (val interface{}, has bool) {
-	val, has = c.data[name]
+func (c *Session) Lookup(name string) (data interface{}, found bool) {
+	data, found = c.data[name]
 	return
 }
 
