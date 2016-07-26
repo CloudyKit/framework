@@ -41,7 +41,7 @@ func (e *Event) Errorf(format string, v ...interface{}) {
 	e.err = fmt.Errorf(format, v...)
 }
 
-type subscription_Group struct {
+type subscriptionGroups struct {
 	rwmutex      sync.RWMutex
 	name         string
 	handlers     []interface{}
@@ -52,7 +52,7 @@ type subscription_Group struct {
 type Emitter struct {
 	parent        *Emitter
 	mx            sync.RWMutex
-	subscriptions []subscription_Group
+	subscriptions []subscriptionGroups
 }
 
 func (manager *Emitter) Inherit() *Emitter {
@@ -106,7 +106,7 @@ func (manager *Emitter) subscribe(groupName string, handler interface{}) {
 		}
 	}
 
-	manager.subscriptions = append(manager.subscriptions, subscription_Group{name: groupName, handlers: []interface{}{handler}})
+	manager.subscriptions = append(manager.subscriptions, subscriptionGroups{name: groupName, handlers: []interface{}{handler}})
 	manager.mx.Unlock()
 }
 
@@ -119,7 +119,7 @@ func (manager *Emitter) Subscribe(groups string, handler interface{}) *Emitter {
 	return manager
 }
 
-func (manager *Emitter) group(groupName string) (group *subscription_Group, ok bool) {
+func (manager *Emitter) group(groupName string) (group *subscriptionGroups, ok bool) {
 	manager.mx.RLock()
 	numOfSubscriptions := len(manager.subscriptions)
 	for i := 0; i < numOfSubscriptions; i++ {

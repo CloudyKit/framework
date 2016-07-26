@@ -1,4 +1,4 @@
-package cdi
+package scope
 
 import (
 	"testing"

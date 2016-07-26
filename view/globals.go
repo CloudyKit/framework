@@ -2,27 +2,27 @@ package view
 
 import (
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
 	"github.com/CloudyKit/framework/request"
+	"github.com/CloudyKit/framework/scope"
 	"reflect"
 )
 
 type provider interface {
-	Provide(c *cdi.Global) interface{}
+	Provide(c *scope.Variables) interface{}
 }
 
 func init() {
 	var defaultGlobal = Globals{}
-	app.Default.Global.Map(defaultGlobal)
-	GlobalInjectName(app.Default.Global, "link", common.URLerType)
+	app.Default.Variables.Map(defaultGlobal)
+	GlobalInjectName(app.Default.Variables, "link", common.URLerType)
 }
 
 type valueProvider struct {
 	v interface{}
 }
 
-func (v valueProvider) Provide(c *cdi.Global) interface{} {
+func (v valueProvider) Provide(c *scope.Variables) interface{} {
 	return v.v
 }
 
@@ -30,20 +30,20 @@ type contextProvider struct {
 	typeof reflect.Type
 }
 
-func (v contextProvider) Provide(c *cdi.Global) interface{} {
+func (v contextProvider) Provide(c *scope.Variables) interface{} {
 	return c.GetByType(v.typeof)
 }
 
 type Globals map[string]provider
 
-func GlobalInjectName(ci *cdi.Global, name string, typ reflect.Type) error {
+func GlobalInjectName(ci *scope.Variables, name string, typ reflect.Type) error {
 	return globalNameProvider(ci, name, contextProvider{typ})
 }
-func GlobalName(ci *cdi.Global, name string, v interface{}) error {
+func GlobalName(ci *scope.Variables, name string, v interface{}) error {
 	return globalNameProvider(ci, name, valueProvider{v})
 }
 
-func globalNameProvider(ci *cdi.Global, name string, v provider) error {
+func globalNameProvider(ci *scope.Variables, name string, v provider) error {
 	globals := ci.GetByPtr(Globals(nil)).(Globals)
 	globals[name] = v
 	return nil
@@ -64,7 +64,7 @@ func (s *setFilter) Set(name string, val interface{}) *setFilter {
 
 func (s *setFilter) Build() request.Filter {
 	return func(c *request.Context, f request.Flow) {
-		v := GetJetContext(c.Global)
+		v := GetRenderer(c.Variables)
 		for i := 0; i < len(s.filters); i++ {
 			v.With(s.filters[i].Name, s.filters[i].Val)
 		}

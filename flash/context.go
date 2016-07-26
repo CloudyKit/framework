@@ -4,8 +4,8 @@ import (
 	"encoding/gob"
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/assert"
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
+	"github.com/CloudyKit/framework/scope"
 	"reflect"
 )
 
@@ -82,7 +82,7 @@ type Boot struct {
 
 var FlasherType = reflect.TypeOf((*Flasher)(nil))
 
-func GetFlasher(cdi *cdi.Global) *Flasher {
+func GetFlasher(cdi *scope.Variables) *Flasher {
 	return cdi.GetByType(FlasherType).(*Flasher)
 }
 
@@ -95,7 +95,7 @@ func (f *flasher) finalize() {
 	}
 }
 
-func (f *flasher) Provide(cdi *cdi.Global) interface{} {
+func (f *flasher) Provide(cdi *scope.Variables) interface{} {
 	return (*Flasher)(f)
 }
 
@@ -103,7 +103,7 @@ func (p *Boot) Bootstrap(a *app.App) {
 	a.Root().AddFilter(func(c *request.Context, f request.Flow) {
 		cc := &flasher{store: p.Store, context: c}
 		defer cc.finalize()
-		c.Global.MapType(FlasherType, cc)
+		c.Variables.MapType(FlasherType, cc)
 		f.Continue()
 	})
 }

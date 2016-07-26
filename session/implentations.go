@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/gob"
-	"github.com/CloudyKit/framework/cdi"
+	"github.com/CloudyKit/framework/scope"
 	"io"
 	"time"
 )
@@ -20,10 +20,10 @@ type Serializer interface {
 }
 
 type Store interface {
-	Reader(c *cdi.Global, name string, after time.Time) (io.ReadCloser, error)
-	Writer(c *cdi.Global, name string) (io.WriteCloser, error)
-	Remove(c *cdi.Global, name string) error
-	GC(c *cdi.Global, before time.Time)
+	Reader(c *scope.Variables, name string, after time.Time) (io.ReadCloser, error)
+	Writer(c *scope.Variables, name string) (io.WriteCloser, error)
+	Remove(c *scope.Variables, name string) error
+	GC(c *scope.Variables, before time.Time)
 }
 
 type RandGenerator struct{}

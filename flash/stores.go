@@ -19,7 +19,7 @@ func (sess Session) getKey() string {
 }
 
 func (sess Session) Read(r *request.Context) (map[string]interface{}, error) {
-	sessContext := session.GetSession(r.Global)
+	sessContext := session.GetSession(r.Variables)
 	if ii, has := sessContext.Lookup(sess.getKey()); has {
 		sessContext.Unset(sess.getKey())
 		return ii.(map[string]interface{}), nil
@@ -28,7 +28,7 @@ func (sess Session) Read(r *request.Context) (map[string]interface{}, error) {
 }
 
 func (sess Session) Save(r *request.Context, val map[string]interface{}) error {
-	sessContext := session.GetSession(r.Global)
+	sessContext := session.GetSession(r.Variables)
 	sessContext.Set(sess.getKey(), val)
 	return nil
 }

@@ -1,7 +1,7 @@
 package file
 
 import (
-	"github.com/CloudyKit/framework/cdi"
+	"github.com/CloudyKit/framework/scope"
 	"io"
 	"io/ioutil"
 	"os"
@@ -23,7 +23,7 @@ func New(directory string) store {
 	return store{directory}
 }
 
-func (store store) Reader(_ *cdi.Global, name string, after time.Time) (reader io.ReadCloser, err error) {
+func (store store) Reader(_ *scope.Variables, name string, after time.Time) (reader io.ReadCloser, err error) {
 	var stat os.FileInfo
 	sessionFile := path.Join(store.BaseDir, name)
 	stat, err = os.Stat(sessionFile)
@@ -45,16 +45,16 @@ func (store store) Reader(_ *cdi.Global, name string, after time.Time) (reader i
 	return
 }
 
-func (store store) Writer(_ *cdi.Global, name string) (writer io.WriteCloser, err error) {
+func (store store) Writer(_ *scope.Variables, name string) (writer io.WriteCloser, err error) {
 	writer, err = os.Create(path.Join(store.BaseDir, name))
 	return
 }
 
-func (store store) Remove(_ *cdi.Global, name string) error {
+func (store store) Remove(_ *scope.Variables, name string) error {
 	return os.Remove(path.Join(store.BaseDir, name))
 }
 
-func (store store) GC(_ *cdi.Global, before time.Time) {
+func (store store) GC(_ *scope.Variables, before time.Time) {
 	files, err := ioutil.ReadDir(store.BaseDir)
 	if err != nil {
 		panic(err)

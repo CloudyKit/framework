@@ -1,9 +1,9 @@
 package app
 
 import (
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
 	"github.com/CloudyKit/framework/request"
+	"github.com/CloudyKit/framework/scope"
 	"github.com/CloudyKit/router"
 
 	"github.com/CloudyKit/framework/events"
@@ -16,22 +16,22 @@ import (
 
 var AppType = reflect.TypeOf((*App)(nil))
 
-func Get(c *cdi.Global) *App {
+func Get(c *scope.Variables) *App {
 	return c.GetByType(AppType).(*App)
 }
 
 var Default = New()
 
 func New() *App {
-	_app := &App{Global: cdi.New(), Router: router.New(), urlGen: make(urlGen), emitter: events.NewEmitter()}
+	_app := &App{Variables: scope.New(), Router: router.New(), urlGen: make(urlGen), emitter: events.NewEmitter()}
 
 	// provide application urlGen as URLer
-	_app.Global.MapType(common.URLerType, _app.urlGen)
+	_app.Variables.MapType(common.URLerType, _app.urlGen)
 	// provide the Router
-	_app.Global.Map(_app.Router)
+	_app.Variables.Map(_app.Router)
 	// provide the app
-	_app.Global.MapType(AppType, _app)
-	_app.Global.MapType(events.EmitterType, _app.emitter)
+	_app.Variables.MapType(AppType, _app)
+	_app.Variables.MapType(events.EmitterType, _app.emitter)
 	return _app
 }
 
@@ -62,10 +62,10 @@ type emitter interface {
 type App struct {
 	emitter
 
-	Global *cdi.Global    // App Global dependency injection context
-	Router *router.Router // Router
-	Prefix string         // Prefix prefix for path added in this app
-	urlGen urlGen
+	Variables *scope.Variables // App Variables dependency injection context
+	Router    *router.Router   // Router
+	Prefix    string           // Prefix prefix for path added in this app
+	urlGen    urlGen
 	filterManager
 }
 
@@ -76,14 +76,14 @@ type Component interface {
 
 // Root returns the root app
 func (app *App) Root() *App {
-	return Get(app.Global)
+	return Get(app.Variables)
 }
 
 func (app *App) Snapshot() *App {
 	_app := *app
 
-	_app.Global = app.Global.Inherit()
-	_app.Global.MapType(AppType, _app)
+	_app.Variables = app.Variables.Inherit()
+	_app.Variables.MapType(AppType, _app)
 
 	return &_app
 }
@@ -96,7 +96,7 @@ func (component ComponentFunc) Bootstrap(a *App) {
 
 // Bootstrap bootstrap a list of components, Bootstrap will created a child CDI context used
 func (app App) Bootstrap(b ...Component) {
-	c := app.Global.Inherit()
+	c := app.Variables.Inherit()
 	defer c.Done4C() // require 0 references at this point
 
 	for i := 0; i < len(b); i++ {
@@ -113,7 +113,7 @@ func (app App) Bootstrap(b ...Component) {
 
 // Done invoke *(cdi.DI).Done
 func (app *App) Done() {
-	app.Global.Done()
+	app.Variables.Done()
 }
 
 type funcHandler func(*request.Context)
@@ -131,30 +131,30 @@ func (app *App) AddHandler(method, path string, handler request.Handler, filters
 }
 
 func (app *App) AddHandlerName(name, method, path string, handler request.Handler, filters ...request.Filter) {
-	app.AddHandlerContextName(app.Global, name, method, path, handler, filters...)
+	app.AddHandlerContextName(app.Variables, name, method, path, handler, filters...)
 }
 
 // AddHandlerContextName accepts a context, a name identifier, http method|methods, pattern path, handler and filters
 // ex: one handler app.AddHandlerContextName(myContext,"mySectionIdentifier","GET", "/public",fileServer,checkAuth)
 //     multiples handles app.AddHandlerContextName(myContext,"mySectionIdentifier","GET|POST|SEARCH", "/products",productHandler,checkAuth)
-func (app *App) AddHandlerContextName(context *cdi.Global, name, method, path string, handler request.Handler, filters ...request.Filter) {
+func (app *App) AddHandlerContextName(context *scope.Variables, name, method, path string, handler request.Handler, filters ...request.Filter) {
 
 	filters = app.reslice(filters...)
 
 	if context == nil {
-		context = app.Global
+		context = app.Variables
 	}
 
 	for _, method := range strings.Split(method, "|") {
 		app.Router.AddRoute(method, app.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 
-			c := newContext(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Global: context.Inherit()})
+			c := newContext(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Variables: context.Inherit()})
 			defer func() {
-				global := c.Global
+				global := c.Variables
 				contextPool.Put(c)
 				global.Done4C() // at this point all finalizers need to be called
 			}() // call finalizers
-			c.Global.Map(c)
+			c.Variables.Map(c)
 			request.NewRequestFlow(c, handler, filters).Continue()
 		})
 	}

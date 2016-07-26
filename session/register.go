@@ -3,7 +3,7 @@ package session
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/CloudyKit/framework/cdi"
+	"github.com/CloudyKit/framework/scope"
 	"reflect"
 	"sync"
 )
@@ -13,7 +13,7 @@ var (
 	rwMx          = sync.Mutex{}
 )
 
-func persistPtr(typOf reflect.Type, c *cdi.Global, mapto string) {
+func persistPtr(typOf reflect.Type, c *scope.Variables, mapto string) {
 	structTyp := typOf.Elem()
 
 	if structTyp.Kind() != reflect.Struct {
@@ -21,7 +21,7 @@ func persistPtr(typOf reflect.Type, c *cdi.Global, mapto string) {
 	}
 
 	sessionsTypes[typOf] = mapto
-	c.MapType(typOf, func(c *cdi.Global) (ret interface{}) {
+	c.MapType(typOf, func(c *scope.Variables) (ret interface{}) {
 		sess := GetSession(c)
 		ret = sess.Get(mapto)
 		if ret == nil {
@@ -33,8 +33,8 @@ func persistPtr(typOf reflect.Type, c *cdi.Global, mapto string) {
 	})
 }
 
-func persistStruct(typOf reflect.Type, c *cdi.Global, mapto string) {
-	c.MapType(typOf, func(c *cdi.Global, t reflect.Value) {
+func persistStruct(typOf reflect.Type, c *scope.Variables, mapto string) {
+	c.MapType(typOf, func(c *scope.Variables, t reflect.Value) {
 		sess := GetSession(c)
 		val := sess.Get(mapto)
 		if val != nil {
@@ -48,11 +48,11 @@ func persistStruct(typOf reflect.Type, c *cdi.Global, mapto string) {
 	})
 }
 
-func Persist(c *cdi.Global, i interface{}) error {
+func Persist(c *scope.Variables, i interface{}) error {
 	return PersistKey(c, "", i)
 }
 
-func PersistKey(c *cdi.Global, key string, i interface{}) error {
+func PersistKey(c *scope.Variables, key string, i interface{}) error {
 	rwMx.Lock()
 	defer rwMx.Unlock()
 	typOf := reflect.TypeOf(i)

@@ -1,10 +1,10 @@
 package events
 
-import "github.com/CloudyKit/framework/cdi"
+import "github.com/CloudyKit/framework/scope"
 
 var sub = &Emitter{}
 
-func Subscribe(global *cdi.Global, groupName string, handler interface{}) *Emitter {
+func Subscribe(global *scope.Variables, groupName string, handler interface{}) *Emitter {
 	if global != nil {
 		if sub := GetEmitter(global); sub != nil {
 			return sub.Subscribe(groupName, handler)
@@ -17,7 +17,7 @@ func NewEmitter() *Emitter {
 	return sub.Inherit()
 }
 
-func Emit(global *cdi.Global, groupName, key string, c interface{}) (bool, error) {
+func Emit(global *scope.Variables, groupName, key string, c interface{}) (bool, error) {
 	if global != nil {
 		if sub := GetEmitter(global); sub != nil {
 			return sub.Emit(groupName, key, c)
@@ -26,7 +26,7 @@ func Emit(global *cdi.Global, groupName, key string, c interface{}) (bool, error
 	return sub.Emit(groupName, key, c)
 }
 
-func Reset(global *cdi.Global, groupName string) bool {
+func Reset(global *scope.Variables, groupName string) bool {
 	if global != nil {
 		if sub := GetEmitter(global); sub != nil {
 			return sub.Reset(groupName)

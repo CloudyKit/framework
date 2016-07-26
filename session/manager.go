@@ -1,8 +1,8 @@
 package session
 
 import (
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/insync"
+	"github.com/CloudyKit/framework/scope"
 	"time"
 )
 
@@ -27,7 +27,7 @@ type mJob struct {
 }
 
 type Manager struct {
-	Global     *cdi.Global
+	Global     *scope.Variables
 	Generator  IdGenerator
 	Store      Store
 	Serializer Serializer
@@ -43,7 +43,7 @@ func (manager *Manager) gcgoroutine() {
 }
 
 //Open load stored session and un serialize the stored data into dst
-func (manager *Manager) Open(ctx *cdi.Global, sessionName string, dst interface{}) error {
+func (manager *Manager) Open(ctx *scope.Variables, sessionName string, dst interface{}) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	reader, err := manager.Store.Reader(ctx, sessionName, time.Now().Add(-manager.Duration))
 	if err == nil && reader != nil {
@@ -56,7 +56,7 @@ func (manager *Manager) Open(ctx *cdi.Global, sessionName string, dst interface{
 }
 
 //Save save the session
-func (manager *Manager) Save(ctx *cdi.Global, sessionName string, session interface{}) error {
+func (manager *Manager) Save(ctx *scope.Variables, sessionName string, session interface{}) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	writer, err := manager.Store.Writer(ctx, sessionName)
 	if err == nil && writer != nil {
@@ -69,7 +69,7 @@ func (manager *Manager) Save(ctx *cdi.Global, sessionName string, session interf
 }
 
 //Remove remove the session
-func (manager *Manager) Remove(ctx *cdi.Global, sessionName string) error {
+func (manager *Manager) Remove(ctx *scope.Variables, sessionName string) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	return manager.Store.Remove(ctx, sessionName)
 }

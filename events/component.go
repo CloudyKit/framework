@@ -2,12 +2,12 @@
 //cdi: *Emitter
 package events
 
-import "github.com/CloudyKit/framework/cdi"
+import "github.com/CloudyKit/framework/scope"
 
 ///cdi:generated
-var EmitterType = cdi.TypeOfElem((**Emitter)(nil))
+var EmitterType = scope.TypeOfElem((**Emitter)(nil))
 
-func GetEmitter(c *cdi.Global) *Emitter {
+func GetEmitter(c *scope.Variables) *Emitter {
 	v, _ := c.GetByType(EmitterType).(*Emitter)
 	return v
 }

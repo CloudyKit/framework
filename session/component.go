@@ -2,8 +2,8 @@ package session
 
 import (
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/request"
+	"github.com/CloudyKit/framework/scope"
 	"log"
 	"net/http"
 	"reflect"
@@ -18,7 +18,7 @@ var (
 	SessionType = reflect.TypeOf((*Session)(nil))
 )
 
-func GetSession(cdi *cdi.Global) *Session {
+func GetSession(cdi *scope.Variables) *Session {
 	return cdi.GetByType(SessionType).(*Session)
 }
 
@@ -35,18 +35,18 @@ func (sp *Boot) Bootstrap(a *app.App) {
 		}
 	}
 
-	app.Get(a.Global).AddFilter(func(c *request.Context, f request.Flow) {
+	app.Get(a.Variables).AddFilter(func(c *request.Context, f request.Flow) {
 		s := _sessionPool.Get().(*Session)
 		s.data = make(sessionData)
-		c.Global.MapType(SessionType, s)
+		c.Variables.MapType(SessionType, s)
 		if readedcookie, _ := c.Request.Cookie(sp.CookieOptions.Name); readedcookie == nil {
 			s._id = sp.Manager.Generator.Generate("", sp.CookieOptions.Name)
 		} else {
 			s._id = sp.Manager.Generator.Generate(readedcookie.Value, sp.CookieOptions.Name)
 			if s._id != readedcookie.Value {
-				sp.Manager.Remove(c.Global, readedcookie.Value)
+				sp.Manager.Remove(c.Variables, readedcookie.Value)
 			}
-			err := sp.Manager.Open(c.Global, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
+			err := sp.Manager.Open(c.Variables, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
 			if err != nil {
 				log.Println("Session read err:", err.Error())
 			}
@@ -76,7 +76,7 @@ func (sp *Boot) Bootstrap(a *app.App) {
 			}
 		}
 
-		err := sp.Manager.Save(c.Global, s._id, s.data)
+		err := sp.Manager.Save(c.Variables, s._id, s.data)
 		_sessionPool.Put(s)
 
 		if err != nil {

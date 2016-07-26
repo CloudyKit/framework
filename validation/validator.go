@@ -1,4 +1,4 @@
-package validator
+package validation
 
 import (
 	"github.com/CloudyKit/router"
@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-type Tester func(c *Context)
+type Tester func(c *Validator)
 type Provider func(i string) reflect.Value
 
 func NewURLValueProvider(vl url.Values) Provider {
@@ -30,24 +30,30 @@ type Error struct {
 
 type Result []Error
 
-func (err Result) Accepted() bool {
-	return len(err) == 0
+func (result Result) Good() bool {
+	return len(result) == 0
 }
 
-func (err Result) Rejected() bool {
-	return len(err) > 0
+func (result Result) Bad() bool {
+	return len(result) > 0
 }
 
-func (m Result) Get(fieldName string) Error {
-	for _, err := range m {
+func (result Result) Lookup(fieldName string) (err *Error, has bool) {
+	for i := 0; i < len(result); i++ {
+		err = &result[i]
 		if err.Field == fieldName {
-			return err
+			return err, true
 		}
 	}
-	return Error{}
+	return nil, false
 }
 
-type Context struct {
+func (result Result) Get(fieldName string) (err *Error) {
+	err, _ = result.Lookup(fieldName)
+	return
+}
+
+type Validator struct {
 	prefix      string
 	Name        string
 	Value       reflect.Value
@@ -59,18 +65,18 @@ type Context struct {
 	stopped     bool
 }
 
-func (cc *Context) Field(name string) reflect.Value {
+func (cc *Validator) Field(name string) reflect.Value {
 	if cc.provider != nil {
 		return cc.provider(name)
 	}
 	return cc.target.FieldByName(name)
 }
 
-func (cc *Context) Done() Result {
+func (cc *Validator) Done() Result {
 	return cc.errors
 }
 
-func (cc *Context) Err(msg string) {
+func (cc *Validator) Err(msg string) {
 
 	if cc.stoponerror {
 		cc.stopped = true
@@ -80,7 +86,7 @@ func (cc *Context) Err(msg string) {
 	cc.errors = append(cc.errors, Error{Field: cc.prefix + cc.Name, Description: msg})
 }
 
-func (cc *Context) at(fieldName string, vs ...Tester) *Context {
+func (cc *Validator) at(fieldName string, vs ...Tester) *Validator {
 	if !cc.stopped {
 		numValidators := len(vs)
 		cc.Value = cc.Field(fieldName)
@@ -96,14 +102,14 @@ func (cc *Context) at(fieldName string, vs ...Tester) *Context {
 	return cc
 }
 
-func newContext(target interface{}) *Context {
+func newContext(target interface{}) *Validator {
 	if target, isProvider := target.(Provider); isProvider {
-		return &Context{provider: target}
+		return &Validator{provider: target}
 	}
-	return &Context{target: reflect.Indirect(reflect.ValueOf(target))}
+	return &Validator{target: reflect.Indirect(reflect.ValueOf(target))}
 }
 
-type At func(fieldName string, vs ...Tester) *Context
+type At func(fieldName string, vs ...Tester) *Validator
 
 func Run(target interface{}, aa func(At)) Result {
 	cc := newContext(target)

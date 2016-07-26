@@ -1,7 +1,7 @@
 package request
 
 import (
-	"github.com/CloudyKit/framework/cdi"
+	"github.com/CloudyKit/framework/scope"
 	"github.com/CloudyKit/router"
 
 	"fmt"
@@ -13,14 +13,14 @@ import (
 var ContextType = reflect.TypeOf((*Context)(nil))
 
 //GetContext get's a Context from the Global context
-func GetContext(cdi *cdi.Global) *Context {
+func GetContext(cdi *scope.Variables) *Context {
 	return cdi.GetByType(ContextType).(*Context)
 }
 
 //Context holds context information about the incoming request
 type Context struct {
 	Name       string              //The name associated with the route
-	Global     *cdi.Global         //Dependency injection context
+	Variables  *scope.Variables    //Dependency injection context
 	Request    *http.Request       //Request data passed by the router
 	Response   http.ResponseWriter //Response Writer passed by the router
 	Parameters router.Parameter    //Route Variables passed by the router

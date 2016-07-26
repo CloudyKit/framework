@@ -1,10 +1,10 @@
 package app
 
 import (
-	"github.com/CloudyKit/framework/cdi"
 	"github.com/CloudyKit/framework/common"
 	"github.com/CloudyKit/framework/events"
 	"github.com/CloudyKit/framework/request"
+	"github.com/CloudyKit/framework/scope"
 	"reflect"
 	"regexp"
 	"sync"
@@ -19,7 +19,7 @@ type (
 
 		pool   *sync.Pool
 		app    *App
-		Global *cdi.Global
+		Global *scope.Variables
 
 		*ctlGen
 		emitter
@@ -33,14 +33,14 @@ type (
 		zeroValue reflect.Value
 	}
 
-	appContext interface {
+	Context interface {
 		Mx(*Mapper)
 	}
 )
 
-func (app *App) BindControllers(controllers ...appContext) {
-	for i := 0; i < len(controllers); i++ {
-		controller := controllers[i]
+func (app *App) BindContext(contexts ...Context) {
+	for i := 0; i < len(contexts); i++ {
+		controller := contexts[i]
 
 		ptrTyp := reflect.TypeOf(controller)
 		structTyp := ptrTyp
@@ -55,7 +55,7 @@ func (app *App) BindControllers(controllers ...appContext) {
 		name := structTyp.String()
 
 		// creates a new di for this controller
-		newDi := app.Global.Inherit()
+		newDi := app.Variables.Inherit()
 
 		// creates a new cascade url generator
 		myGen := new(ctlGen)
@@ -67,7 +67,7 @@ func (app *App) BindControllers(controllers ...appContext) {
 		newDi.MapType(common.URLerType, myGen)
 
 		emitter := app.emitter.(*events.Emitter)
-		newDi.MapType(events.EmitterType, func(c *cdi.Global) interface{} {
+		newDi.MapType(events.EmitterType, func(c *scope.Variables) interface{} {
 			return emitter.Inherit()
 		})
 
@@ -93,7 +93,7 @@ func (handler *contextHandler) Handle(c *request.Context) {
 
 	// get's or allocates a new context
 	ctx := reflect.ValueOf(ii)
-	c.Global.InjectInStructValue(ctx.Elem())
+	c.Variables.InjectInStructValue(ctx.Elem())
 
 	var arguments = [1]reflect.Value{ctx}
 	if handler.isPtr == false {

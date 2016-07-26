@@ -47,7 +47,7 @@ var skip = len("//cdi:")
 func (types *File) ParseComments(filecontent string) {
 	for _, line := range strings.Split(filecontent, "\n") {
 
-		if strings.HasPrefix(line, "///cdi:generated") {
+		if strings.HasPrefix(line, "///scopevar:generated") {
 			types.generated = !types.generated
 			continue
 		}
@@ -57,7 +57,7 @@ func (types *File) ParseComments(filecontent string) {
 		}
 
 		types.lines = append(types.lines, line)
-		if !strings.HasPrefix(line, "//cdi:") {
+		if !strings.HasPrefix(line, "//scopeGetter:") {
 			continue
 		}
 
@@ -117,18 +117,18 @@ func main() {
 	}
 	defer file.Close()
 
-	template, _ := jet.NewSet().LoadTemplate("--", `{{if .Pkg}}
+	template, _ := jet.NewSet(nil).LoadTemplate("--", `{{if .Pkg}}
 package {{.Pkg}}
-import "github.com/CloudyKit/framework/cdi"
+import "github.com/CloudyKit/framework/scope"
 {{end}}
-///cdi:generated
+///scopevar:generated
 {{range .Types}}var {{.TypeName}} = cdi.TypeOfElem({{.GetTypeValue()}})
 func {{.GetterName}}(c *cdi.DI) {{.GetType()}} {
 	v,_:=c.Val4Type({{.TypeName}}).({{.GetType()}})
 	return v
 }
 {{end}}
-///cdi:generated`)
+///scopevar:generated`)
 
 	fset := token.NewFileSet()
 	gof, _ := parser.ParseFile(fset, *filename, filecontent, parser.ImportsOnly)
@@ -148,11 +148,11 @@ func {{.GetterName}}(c *cdi.DI) {{.GetType()}} {
 		types.ParseComments(filecontentstring[gof.End():])
 		for _, _import := range gof.Imports {
 			path, _ := strconv.Unquote(_import.Path.Value)
-			if path == "github.com/CloudyKit/framework/cdi" {
+			if path == "github.com/CloudyKit/framework/scope" {
 				goto found
 			}
 		}
-		file.WriteString(`import "github.com/CloudyKit/framework/cdi"` + "\n")
+		file.WriteString(`import "github.com/CloudyKit/framework/scope"` + "\n")
 	found:
 		types.Pkg = ""
 		for _, line := range types.lines {
