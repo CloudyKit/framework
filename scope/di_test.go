@@ -12,7 +12,7 @@ func TestDiProvideAndInject(t *testing.T) {
 
 	// creates a new DI context
 	var newContext = New()
-	defer newContext.Done()
+	defer newContext.End()
 
 	var tt testHolder
 
@@ -27,7 +27,7 @@ func TestDiProvideAndInject(t *testing.T) {
 
 	// creates a child context
 	newChildContext := newContext.Inherit()
-	defer newChildContext.Done()
+	defer newChildContext.End()
 
 	// reset tt value
 	tt = testHolder{}
@@ -40,7 +40,7 @@ func TestDiProvideAndInject(t *testing.T) {
 	}
 
 	var empty = New()
-	defer empty.Done()
+	defer empty.End()
 	tt = testHolder{}
 	if tt.T != nil {
 		t.Fail()
@@ -60,7 +60,7 @@ func TestDiDone(t *testing.T) {
 		t.Fatal("Inválid reference counting ", childContext.references)
 	}
 
-	childContext.Done()
+	childContext.End()
 	if childContext.parent != nil {
 		t.Fatal("Inválid reference counting ", childContext.references)
 	}
@@ -68,7 +68,7 @@ func TestDiDone(t *testing.T) {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
 
-	context.Done()
+	context.End()
 	if context.parent != nil {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
@@ -110,6 +110,6 @@ func BenchmarkInjectChild(b *testing.B) {
 		context := context.Inherit()
 		context.Map(b)
 		context.Inject(&tt)
-		context.Done()
+		context.End()
 	}
 }

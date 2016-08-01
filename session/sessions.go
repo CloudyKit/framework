@@ -24,7 +24,7 @@ var (
 
 func init() {
 	gob.Register(sessionData(nil))
-	app.Default.Bootstrap(&Boot{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
+	app.Default.Bootstrap(&Component{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
 }
 
 //New returns a new session

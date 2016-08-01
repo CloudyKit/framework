@@ -19,6 +19,14 @@ type Event struct {
 	*Emitter
 }
 
+func (e *Event) Group() string {
+	return e.group
+}
+
+func (e *Event) Key() string {
+	return e.key
+}
+
 func (e *Event) UnSubscribe() {
 	if sub, found := e.Emitter.group(e.group); found {
 		go func(i int64) {
@@ -77,6 +85,8 @@ func validateHandler(h interface{}) error {
 }
 
 func (manager *Emitter) Reset(groupName string) bool {
+	manager.assert()
+
 	subsgroup, ok := manager.group(groupName)
 	if ok {
 		subsgroup.rwmutex.Lock()
@@ -110,8 +120,13 @@ func (manager *Emitter) subscribe(groupName string, handler interface{}) {
 	manager.mx.Unlock()
 }
 
-// Subscribe to one event group
+// Subscribe an event group, you can subscribe to multiple events groups by separating group names with |
+// example "group1|group2" will subscribe group1 and group2, take per example app.run and app.run.tls
+// subscribing to app.run events groups with be as simples as app.Subscribe("app.run|app.run.tls",func(e *events.Event,a *app.App){
+// 	println("App is starting a server ", e.Group())
+// })
 func (manager *Emitter) Subscribe(groups string, handler interface{}) *Emitter {
+	manager.assert()
 	groupnames := strings.Split(groups, "|")
 	for i := 0; i < len(groupnames); i++ {
 		manager.subscribe(groupnames[i], handler)
@@ -132,11 +147,17 @@ func (manager *Emitter) group(groupName string) (group *subscriptionGroups, ok b
 	return
 }
 
-func (manager *Emitter) emit(event *Event, c, e reflect.Value) (canceled bool, err error) {
+// assert valid emitter
+func (manager *Emitter) assert() {
 	if manager.parent == nil && manager != sub {
 		panic(errors.New("All emitters are required to inherit from root,\ncheck if you'are not using a zero value or\nif you are not a using a Emitter struct instead of a pointer."))
 	}
-	var cType = c.Type()
+}
+
+func (manager *Emitter) emit(event *Event, c, e reflect.Value) (canceled bool, err error) {
+	manager.assert()
+
+	var _type = c.Type()
 	var _arg [2]reflect.Value
 	var _argslice = _arg[:]
 	_argslice[0] = e
@@ -150,7 +171,7 @@ func (manager *Emitter) emit(event *Event, c, e reflect.Value) (canceled bool, e
 		for event.i = group.topHandler; event.i >= 0; event.i-- {
 			v := reflect.ValueOf(group.handlers[event.i])
 
-			if cType.AssignableTo(v.Type().In(1)) {
+			if _type.AssignableTo(v.Type().In(1)) {
 				v.Call(_argslice)
 				canceled, err = event.canceled, event.err
 				if canceled || err != nil {
@@ -168,8 +189,8 @@ func (manager *Emitter) emit(event *Event, c, e reflect.Value) (canceled bool, e
 
 // Emit emits an event in the given group with the specified key,
 // calling *Event.Cancel() will stop the event propagation, calling *Event.Error(err) will flag an error
-// and cancelate the event propagation
-func (manager *Emitter) Emit(groupName, key string, context interface{}) (canceled bool, err error) {
+// and cancel the event propagation
+func (manager *Emitter) Emit(groupName, key string, context interface{}) (bool, error) {
 	var event = &Event{group: groupName, key: key}
 	return manager.emit(event, reflect.ValueOf(context), reflect.ValueOf(event))
 }

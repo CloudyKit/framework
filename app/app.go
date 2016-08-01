@@ -26,7 +26,7 @@ func New() *App {
 	_app := &App{Variables: scope.New(), Router: router.New(), urlGen: make(urlGen), emitter: events.NewEmitter()}
 
 	// provide application urlGen as URLer
-	_app.Variables.MapType(common.URLerType, _app.urlGen)
+	_app.Variables.MapType(common.URLGenType, _app.urlGen)
 	// provide the Router
 	_app.Variables.Map(_app.Router)
 	// provide the app
@@ -35,23 +35,38 @@ func New() *App {
 	return _app
 }
 
-type filterManager struct {
-	filters []request.Filter
+type filterHandlers struct {
+	filters []request.Handler
 }
 
-// AddFilter adds filters to the request chain
-func (f *filterManager) AddFilter(filters ...request.Filter) {
+func (f *filterHandlers) ResetMiddleHandlers() {
+	f.filters = nil
+}
+
+// AddMiddleHandler adds filters to the request chain
+func (f *filterHandlers) AddMiddleHandlers(filters ...request.Handler) {
 	f.filters = append(f.filters, filters...)
 }
 
-func (f *filterManager) reslice(filters ...request.Filter) []request.Filter {
-	if len(filters) > 0 {
-		newFilter := make([]request.Filter, 0, len(f.filters)+len(filters))
-		newFilter = append(newFilter, f.filters...)
-		newFilter = append(newFilter, filters...)
-		return newFilter
-	}
-	return f.filters[0:len(f.filters)]
+//func (f *filterHandlers) AddMiddleHandlersFunc(filters ...request.HandlerFunc) {
+//	nlen := len(filters) + len(f.filters)
+//
+//	nfilters := make([]request.Handler, nlen)
+//
+//	copy(nfilters, f.filters)
+//
+//	for i, j := len(f.filters), 0; i < nlen; i, j = i + 1, j + 1 {
+//		nfilters[i] = filters[j]
+//	}
+//
+//	f.filters = nfilters
+//}
+
+func (f *filterHandlers) reslice(filters ...request.Handler) []request.Handler {
+	newFilter := make([]request.Handler, 0, len(f.filters)+len(filters))
+	newFilter = append(newFilter, f.filters...)
+	newFilter = append(newFilter, filters...)
+	return newFilter
 }
 
 type emitter interface {
@@ -59,6 +74,8 @@ type emitter interface {
 	Emit(groupName, key string, context interface{}) (canceled bool, err error)
 }
 
+// App app holds your top level data for you application
+// Router, Emitter, Scope
 type App struct {
 	emitter
 
@@ -66,10 +83,12 @@ type App struct {
 	Router    *router.Router   // Router
 	Prefix    string           // Prefix prefix for path added in this app
 	urlGen    urlGen
-	filterManager
+	filterHandlers
 }
 
-// Component an component
+// Component represents a application component, a component need to implement
+// a bootstrap method which is responsible to setup the component with the app,
+// ex: register a type Providers, or add middleware handler
 type Component interface {
 	Bootstrap(app *App)
 }
@@ -79,6 +98,8 @@ func (app *App) Root() *App {
 	return Get(app.Variables)
 }
 
+// Snapshot causes a sub app to be created and inserted in the scope
+// calling app.Root will return the created sub app
 func (app *App) Snapshot() *App {
 	_app := *app
 
@@ -88,16 +109,19 @@ func (app *App) Snapshot() *App {
 	return &_app
 }
 
+// ComponentFunc func implementing Component interface
 type ComponentFunc func(*App)
 
 func (component ComponentFunc) Bootstrap(a *App) {
 	component(a)
 }
 
-// Bootstrap bootstrap a list of components, Bootstrap will created a child CDI context used
+// Bootstrap bootstrap a list of components, a sub scope will be created, and a copy of the
+// original app is used, in such form that modifing the app.Prefix will not reflect outside this
+// call.
 func (app App) Bootstrap(b ...Component) {
 	c := app.Variables.Inherit()
-	defer c.Done4C() // require 0 references at this point
+	defer c.EndForce() // require 0 references at this point
 
 	for i := 0; i < len(b); i++ {
 		bv := reflect.ValueOf(b[i])
@@ -111,53 +135,57 @@ func (app App) Bootstrap(b ...Component) {
 	}
 }
 
-// Done invoke *(cdi.DI).Done
-func (app *App) Done() {
-	app.Variables.Done()
+// End same as app.Variables.End() invoke this func before exiting the app to cleanup
+func (app *App) End() {
+	app.Variables.End()
 }
 
-type funcHandler func(*request.Context)
-
-func (fn funcHandler) Handle(c *request.Context) {
-	fn(c)
-}
-
-func (add *App) AddHandlerFunc(method, path string, fn funcHandler, filters ...request.Filter) {
+// AddHandlerFunc register a func handler, see: request.Handler
+func (add *App) AddHandlerFunc(method, path string, fn request.HandlerFunc, filters ...request.Handler) {
 	add.AddHandler(method, path, fn, filters...)
 }
 
-func (app *App) AddHandler(method, path string, handler request.Handler, filters ...request.Filter) {
+// AddHandlerFunc register a handler, see: request.Handler
+func (app *App) AddHandler(method, path string, handler request.Handler, filters ...request.Handler) {
 	app.AddHandlerName("", method, path, handler, filters...)
 }
 
-func (app *App) AddHandlerName(name, method, path string, handler request.Handler, filters ...request.Filter) {
+// AddHandlerFunc register a named handler, see: request.Handler
+func (app *App) AddHandlerName(name, method, path string, handler request.Handler, filters ...request.Handler) {
 	app.AddHandlerContextName(app.Variables, name, method, path, handler, filters...)
 }
 
 // AddHandlerContextName accepts a context, a name identifier, http method|methods, pattern path, handler and filters
 // ex: one handler app.AddHandlerContextName(myContext,"mySectionIdentifier","GET", "/public",fileServer,checkAuth)
 //     multiples handles app.AddHandlerContextName(myContext,"mySectionIdentifier","GET|POST|SEARCH", "/products",productHandler,checkAuth)
-func (app *App) AddHandlerContextName(context *scope.Variables, name, method, path string, handler request.Handler, filters ...request.Filter) {
+func (app *App) AddHandlerContextName(variables *scope.Variables, name, method, path string, handler request.Handler, filters ...request.Handler) {
 
-	filters = app.reslice(filters...)
+	filters = append(app.reslice(filters...), handler)
 
-	if context == nil {
-		context = app.Variables
+	if variables == nil {
+		variables = app.Variables
 	}
 
 	for _, method := range strings.Split(method, "|") {
 		app.Router.AddRoute(method, app.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 
-			c := newContext(request.Context{Name: name, Response: rw, Request: r, Parameters: v, Variables: context.Inherit()})
-			defer func() {
-				global := c.Variables
-				contextPool.Put(c)
-				global.Done4C() // at this point all finalizers need to be called
-			}() // call finalizers
-			c.Variables.Map(c)
-			request.NewRequestFlow(c, handler, filters).Continue()
+			c := newRequestContext()
+			defer requestRecover(c)
+
+			request.Advance(c, name, rw, r, v, variables.Inherit(), filters)
 		})
 	}
+}
+
+// requestRecover finalizes and cleanup request allocated scope variables
+func requestRecover(c *request.Context) {
+
+	variables := c.Variables
+	request_Context_pool.Put(c)
+
+	// we call scope EndForce, this require that all children scopes Ended in this call if not
+	// panic is raised
+	variables.EndForce()
 }
 
 func (app *App) host(host string) (servein string) {
@@ -174,25 +202,26 @@ func (app *App) host(host string) (servein string) {
 	return
 }
 
+// RunServer runs the server with the specified host
+// Calling this func will emit a "app.run" event in the app
 func (app *App) RunServer(host string) error {
 	app.Emit("app.run", host, app)
 	return http.ListenAndServe(host, app.Router)
 }
 
-func (app *App) RunServerTls(host, certfile, keyfile string) error {
+// RunServerTLS runs the server in tls mode
+// Calling this func will emit a "app.run.tls" event in the app
+func (app *App) RunServerTLS(host, certfile, keyfile string) error {
 	app.Emit("app.run.tls", host, app)
 	return http.ListenAndServeTLS(app.host(host), certfile, keyfile, app.Router)
 }
 
-var contextPool = sync.Pool{
+var request_Context_pool = sync.Pool{
 	New: func() interface{} {
 		return new(request.Context)
 	},
 }
 
-// New make a new request context,
-func newContext(c request.Context) (cc *request.Context) {
-	cc = contextPool.Get().(*request.Context)
-	*cc = c
-	return
+func newRequestContext() *request.Context {
+	return request_Context_pool.Get().(*request.Context)
 }

@@ -23,7 +23,7 @@ type (
 
 		*ctlGen
 		emitter
-		filterManager
+		filterHandlers
 	}
 
 	contextHandler struct {
@@ -64,7 +64,7 @@ func (app *App) BindContext(contexts ...Context) {
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
-		newDi.MapType(common.URLerType, myGen)
+		newDi.MapType(common.URLGenType, myGen)
 
 		emitter := app.emitter.(*events.Emitter)
 		newDi.MapType(events.EmitterType, func(c *scope.Variables) interface{} {
@@ -108,7 +108,7 @@ func (handler *contextHandler) Handle(c *request.Context) {
 
 var acRegex = regexp.MustCompile("/[:*][^/]+")
 
-func (mx *Mapper) BindAction(method, path, action string, filters ...request.Filter) {
+func (mx *Mapper) BindAction(method, path, action string, filters ...request.Handler) {
 	methodByName, isPtr := mx.typ.MethodByName(action)
 	if !isPtr {
 		methodByName, _ = mx.typ.Elem().MethodByName(action)

@@ -6,22 +6,28 @@ import (
 )
 
 // BindGetForm decodes the request url values into target
-func (c *Context) BindGetForm(target interface{}) error {
-	if c.Request.Form == nil {
-		c.Request.ParseForm()
+func (ctx *Context) BindGetForm(target interface{}) error {
+	if ctx.Request.Form == nil {
+		ctx.Request.ParseForm()
 	}
-	return formam.Decode(c.Request.Form, target)
+	return formam.Decode(ctx.Request.Form, target)
 }
 
 // BindJSON decodes request post data into target
-func (c *Context) BindForm(target interface{}) error {
-	if c.Request.PostForm == nil {
-		c.Request.ParseForm()
+func (ctx *Context) BindForm(target interface{}) error {
+	if ctx.Request.PostForm == nil {
+		ctx.Request.ParseForm()
 	}
-	return formam.Decode(c.Request.PostForm, target)
+	return formam.Decode(ctx.Request.PostForm, target)
 }
 
 // BindJSON decodes request body as json into the target
-func (c *Context) BindJSON(target interface{}) error {
-	return json.NewDecoder(c.Request.Body).Decode(target)
+func (ctx *Context) BindJSON(target interface{}) error {
+	return json.NewDecoder(ctx.Request.Body).Decode(target)
 }
+
+// todo: add a generic bind func which will decode values conforming with
+// the request content-type or a query string contentType containing the mime type.
+// func (ctx *Context) Bind(target interface{}) error {
+//	return ctx.BindForm(target)
+// }

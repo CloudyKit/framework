@@ -187,8 +187,10 @@ func (c *Variables) GetByPtr(typ interface{}) interface{} {
 	return c.GetByType(reflect.TypeOf(typ))
 }
 
-// Done should be called when the context is not being used anymore
-func (c *Variables) Done() int64 {
+// End call end when the request is not need any more, this will cause all finalizers to run,
+// this will my cause parent scopes to end also, this will happen case the parent scopes already ended but
+// is waiting all children to end
+func (c *Variables) End() int64 {
 	// check if this is the last active reference
 	c.references = atomic.AddInt64(&c.references, -1)
 
@@ -200,17 +202,18 @@ func (c *Variables) Done() int64 {
 	return c.references
 }
 
-var err = errors.New("Done4C requested that at this point all references to this context are previous cleared")
+var err = errors.New("scope.Variables.EndForce: requested that at this point all references to this context are previous cleared")
 
-func (c *Variables) Done4C() {
-	if c.Done() > -1 {
+// EndForce works same as End, but require that all children to be terminated when called
+func (c *Variables) EndForce() {
+	if c.End() > -1 {
 		panic(err)
 	}
 }
 
 func (c *Variables) recycle() {
 	if c.parent != nil {
-		c.parent.Done()
+		c.parent.End()
 		c.parent = nil
 	}
 	pool.Put(c)
@@ -237,6 +240,6 @@ func Checkpoint(c **Variables) func() {
 	return func() {
 		cc := (*c)
 		*c = cc.parent
-		cc.Done()
+		cc.End()
 	}
 }

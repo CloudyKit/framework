@@ -11,7 +11,7 @@ import (
 
 func init() {
 	gob.Register((map[string]interface{})(nil))
-	app.Default.Bootstrap(&Boot{Session{defaultKey}})
+	app.Default.Bootstrap(&Component{Session{defaultKey}})
 }
 
 type Store interface {
@@ -76,7 +76,7 @@ func (c *Flasher) Reflash(keys ...string) {
 	}
 }
 
-type Boot struct {
+type Component struct {
 	Store
 }
 
@@ -99,11 +99,21 @@ func (f *flasher) Provide(cdi *scope.Variables) interface{} {
 	return (*Flasher)(f)
 }
 
-func (p *Boot) Bootstrap(a *app.App) {
-	a.Root().AddFilter(func(c *request.Context, f request.Flow) {
-		cc := &flasher{store: p.Store, context: c}
-		defer cc.finalize()
-		c.Variables.MapType(FlasherType, cc)
-		f.Continue()
-	})
+func (component *Component) Handle(ctx *request.Context) {
+
+	// allocates the flasher|flasherProvider
+	flasher := &flasher{store: component.Store, context: ctx}
+
+	// maps flasher in the request scope
+	ctx.Variables.MapType(FlasherType, flasher)
+
+	// advance with the request
+	ctx.Advance()
+
+	// finalize the request
+	flasher.finalize()
+}
+
+func (component *Component) Bootstrap(a *app.App) {
+	a.Root().AddMiddleHandlers(component)
 }

@@ -9,7 +9,7 @@ type urlGen map[string]string
 type ctlGen struct {
 	urlGen urlGen
 	id     string
-	Parent common.URLer
+	Parent common.URLGen
 }
 
 func (urler *ctlGen) URL(dst string, v ...interface{}) string {
