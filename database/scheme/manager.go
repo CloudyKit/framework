@@ -1,7 +1,7 @@
 package scheme
 
 func New(entityName, primaryKey string) *Scheme {
-	scheme := &Scheme{name: entityName, primaryKey: primaryKey, fields: make(map[string]*Field)}
+	scheme := &Scheme{name: entityName, primaryKey: primaryKey}
 	return scheme
 }
 

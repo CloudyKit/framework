@@ -1,4 +1,10 @@
 package change
 
-type Operation struct {
+import "reflect"
+
+type Operation interface{}
+
+type Set struct {
+	Field string
+	Value reflect.Value
 }

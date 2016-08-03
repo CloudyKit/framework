@@ -15,15 +15,17 @@ var (
 		def.Field("Name", scheme.String{255})
 		def.Field("Age", scheme.Int{})
 
-		def.Refs("Categories", CategoryScheme, "CategoryID", "products_to_categories")
-		def.RefsChildren("Promotions", PromotionScheme, "PromotionID")
+		def.RefRelates("Categories", CategoryScheme, "CategoryID", "products_to_categories")
+		def.RefChildren("Promotions", PromotionScheme, "PromotionID")
 
 	})
 
 	_ = scheme.Init(CategoryScheme, func(def *scheme.Def) {
 
 		def.Field("Name", scheme.String{255})
-		def.RefsFrom("Products", ProductScheme, "ProductID")
+		def.Field("Description", scheme.String{255})
+		def.RefRelatesBack("Products", ProductScheme, "ProductID")
+
 	})
 )
 

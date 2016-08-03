@@ -73,6 +73,9 @@ func (cc *Validator) Field(name string) reflect.Value {
 }
 
 func (cc *Validator) Done() Result {
+	if cc == nil {
+		return nil
+	}
 	return cc.errors
 }
 

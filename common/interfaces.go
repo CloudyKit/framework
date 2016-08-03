@@ -8,13 +8,8 @@ import (
 )
 
 var (
-	NamedType  = reflect.TypeOf((*Named)(nil)).Elem()
 	URLGenType = reflect.TypeOf((*URLGen)(nil)).Elem()
 )
-
-type Named interface {
-	Name() string
-}
 
 // URLGen url generator
 type URLGen interface {
@@ -52,6 +47,7 @@ func GenURL(cdi *scope.Variables, resource string, v ...interface{}) string {
 // ex: NewBaseURL("/search")("q", "my search input","page",5) will result in /search?q=my search input&page=5
 type BaseURL func(...interface{}) string
 
+// NewBaseURL creates a new BaseURL, see type BaseURL func(...interface{}) string
 func NewBaseURL(url string) BaseURL {
 	return func(v ...interface{}) string {
 		numOfArgs := len(v)
