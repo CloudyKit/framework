@@ -1,7 +1,29 @@
+// MIT License
+//
+// Copyright (c) 2017 José Santos <henrique_1609@me.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package file
 
 import (
-	"github.com/CloudyKit/framework/scope"
+	"github.com/CloudyKit/framework/container"
 	"io"
 	"io/ioutil"
 	"os"
@@ -23,7 +45,7 @@ func New(directory string) store {
 	return store{directory}
 }
 
-func (store store) Reader(_ *scope.Variables, name string, after time.Time) (reader io.ReadCloser, err error) {
+func (store store) Reader(_ *container.IoC, name string, after time.Time) (reader io.ReadCloser, err error) {
 	var stat os.FileInfo
 	sessionFile := path.Join(store.BaseDir, name)
 	stat, err = os.Stat(sessionFile)
@@ -45,16 +67,16 @@ func (store store) Reader(_ *scope.Variables, name string, after time.Time) (rea
 	return
 }
 
-func (store store) Writer(_ *scope.Variables, name string) (writer io.WriteCloser, err error) {
+func (store store) Writer(_ *container.IoC, name string) (writer io.WriteCloser, err error) {
 	writer, err = os.Create(path.Join(store.BaseDir, name))
 	return
 }
 
-func (store store) Remove(_ *scope.Variables, name string) error {
+func (store store) Remove(_ *container.IoC, name string) error {
 	return os.Remove(path.Join(store.BaseDir, name))
 }
 
-func (store store) GC(_ *scope.Variables, before time.Time) {
+func (store store) GC(_ *container.IoC, before time.Time) {
 	files, err := ioutil.ReadDir(store.BaseDir)
 	if err != nil {
 		panic(err)

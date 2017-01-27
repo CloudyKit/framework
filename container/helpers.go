@@ -20,53 +20,71 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package session
+package container
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/gob"
-	"github.com/CloudyKit/framework/container"
 	"io"
-	"time"
+	"sync"
 )
 
-// IdGenerator this interface represents an id generator
-type IdGenerator interface {
-	Generate(id, name string) string
-}
-
-type Serializer interface {
-	Serialize(session interface{}, w io.Writer) error
-	Unserialize(session interface{}, r io.Reader) error
-}
-
-type Store interface {
-	Reader(c *container.IoC, name string, after time.Time) (io.ReadCloser, error)
-	Writer(c *container.IoC, name string) (io.WriteCloser, error)
-	Remove(c *container.IoC, name string) error
-	GC(c *container.IoC, before time.Time)
-}
-
-type RandGenerator struct{}
-type GobSerializer struct{}
-
-func (RandGenerator) Generate(id, name string) string {
-	if id == "" {
-		b := make([]byte, 16)
-		n, err := io.ReadFull(rand.Reader, b)
-		if n != len(b) || err != nil {
-			panic(err)
-		}
-		return base64.URLEncoding.EncodeToString(b)
+var (
+	//pools
+	ioCloserProviderPool = sync.Pool{
+		New: func() interface{} {
+			return new(ioCloserProvider)
+		},
 	}
-	return id
+
+	poolerProviderPool = sync.Pool{
+		New: func() interface{} {
+			return new(poolerProvider)
+		},
+	}
+)
+
+func NewIOCloserProvider(v io.Closer) (closer *ioCloserProvider) {
+	closer, _ = ioCloserProviderPool.Get().(*ioCloserProvider)
+	closer.Value = v
+	return
 }
 
-func (serializer GobSerializer) Unserialize(dst interface{}, reader io.Reader) error {
-	return gob.NewDecoder(reader).Decode(dst)
+func NewPoolProvider(pool *sync.Pool, v interface{}) (pooler *poolerProvider) {
+	pooler, _ = poolerProviderPool.Get().(*poolerProvider)
+	pooler.Pool = pool
+	pooler.Value = v
+	return
 }
 
-func (serializer GobSerializer) Serialize(src interface{}, writer io.Writer) error {
-	return gob.NewEncoder(writer).Encode(src)
+type ioCloserProvider struct {
+	Value io.Closer
+}
+
+type poolerProvider struct {
+	Pool  *sync.Pool
+	Value interface{}
+}
+
+func (pooler *poolerProvider) Provide(c *IoC) interface{} {
+	if pooler.Value != nil {
+		return pooler.Value
+	}
+	pooler.Value = pooler.Pool.Get()
+	return pooler.Value
+}
+
+func (pooler *poolerProvider) Dispose() {
+	if pooler.Value != nil {
+		pooler.Pool.Put(pooler.Value)
+	}
+	poolerProviderPool.Put(pooler)
+}
+
+func (pp *ioCloserProvider) Dispose() {
+	closer := pp.Value
+	ioCloserProviderPool.Put(pp)
+	closer.Close()
+}
+
+func (pp *ioCloserProvider) Provide(_ *IoC) interface{} {
+	return pp.Value
 }

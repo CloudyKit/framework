@@ -20,40 +20,62 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package request
+package ensure
 
 import (
-	"github.com/CloudyKit/framework/container"
-	"github.com/CloudyKit/router"
-	"net/http"
+	"fmt"
+	"path"
+	"runtime"
+	"strings"
 )
 
-// HandlerFunc func implementing Handler interface
-type HandlerFunc func(*Context)
-
-func (fn HandlerFunc) Handle(c *Context) {
-	fn(c)
+type Unexpected struct {
+	Msg, PackageName, FileName, FuncName string
+	Line                                 int
 }
 
-// Handler is responsible to handle the request or part of the request, ex: a middleware handler would
-// process some data put the data into the scope.Variables and invoke Advance which will invoke the next
-// handler, the last handler is responsible for the main logic of the request.
-// calling Advance in the last handler will panic.
-type Handler interface {
-	Handle(*Context)
+func (u *Unexpected) Error() string {
+	return fmt.Sprintf("(%s).%s => %s on file %s line %d", u.PackageName, u.FuncName, u.Msg, u.FileName, u.Line)
 }
 
-// Advance entry point
-func Advance(c *Context, name string, w http.ResponseWriter, r *http.Request, p router.Parameter, v *container.IoC, h []Handler) {
-	c.Name = name
-	c.Response = w
-	c.Request = r
-	c.Parameters = p
-	c.IoC = v
-	c.handlers = h
+func getErr(msg string) *Unexpected {
+	pc, file, line, _ := runtime.Caller(2)
+	_, fileName := path.Split(file)
+	parts := strings.Split(runtime.FuncForPC(pc).Name(), ".")
+	pl := len(parts)
+	packageName := ""
+	funcName := parts[pl-1]
 
-	//maps the request context into the scoped variables
-	v.Map(c)
+	if parts[pl-2][0] == '(' {
+		funcName = parts[pl-2] + "." + funcName
+		packageName = strings.Join(parts[0:pl-2], ".")
+	} else {
+		packageName = strings.Join(parts[0:pl-1], ".")
+	}
 
-	c.Advance()
+	return &Unexpected{
+		Msg:         msg,
+		PackageName: packageName,
+		FileName:    fileName,
+		FuncName:    funcName,
+		Line:        line,
+	}
+}
+
+func Condition(cond bool, msg string) {
+	if !cond {
+		panic(getErr(msg))
+	}
+}
+
+func Nil(value interface{}, msg string) {
+	if value != nil {
+		panic(getErr(msg))
+	}
+}
+
+func NilErr(err error) {
+	if err != nil {
+		panic(getErr(err.Error()))
+	}
 }

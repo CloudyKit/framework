@@ -1,5 +1,5 @@
 // Package formam implements functions to decode values of a html form.
-package formam
+package request
 
 import (
 	"encoding"

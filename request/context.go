@@ -1,7 +1,29 @@
+// MIT License
+//
+// Copyright (c) 2017 José Santos <henrique_1609@me.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package request
 
 import (
-	"github.com/CloudyKit/framework/scope"
+	"github.com/CloudyKit/framework/container"
 	"github.com/CloudyKit/router"
 
 	"errors"
@@ -15,16 +37,16 @@ import (
 var ContextType = reflect.TypeOf((*Context)(nil))
 
 // GetContext get's a Context from the Global context
-func GetContext(cdi *scope.Variables) *Context {
-	return cdi.GetByType(ContextType).(*Context)
+func GetContext(cdi *container.IoC) *Context {
+	return cdi.LoadType(ContextType).(*Context)
 }
 
 // Context holds context information about the incoming request
 type Context struct {
-	Name      string           // The name associated with the route
-	Variables *scope.Variables // Dependency injection context
-	Request   *http.Request    // Request data passed by the router
-	Gen       *common.URLGen
+	Name    string         // The name associated with the route
+	IoC     *container.IoC // Dependency injection context
+	Request *http.Request  // Request data passed by the router
+	Gen     *common.URLGen
 
 	handlers []Handler
 

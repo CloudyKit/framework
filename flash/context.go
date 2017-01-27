@@ -1,11 +1,33 @@
+// MIT License
+//
+// Copyright (c) 2017 José Santos <henrique_1609@me.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package flash
 
 import (
 	"encoding/gob"
 	"github.com/CloudyKit/framework/app"
-	"github.com/CloudyKit/framework/assert"
+	"github.com/CloudyKit/framework/container"
+	"github.com/CloudyKit/framework/ensure"
 	"github.com/CloudyKit/framework/request"
-	"github.com/CloudyKit/framework/scope"
 	"reflect"
 )
 
@@ -36,7 +58,7 @@ func (c *Flasher) initReader() {
 	if c.readed == false {
 		var err error
 		c.Data, err = c.store.Read(c.context)
-		assert.NilErr(err)
+		ensure.NilErr(err)
 		c.readed = true
 	}
 }
@@ -82,20 +104,20 @@ type Component struct {
 
 var FlasherType = reflect.TypeOf((*Flasher)(nil))
 
-func GetFlasher(cdi *scope.Variables) *Flasher {
-	return cdi.GetByType(FlasherType).(*Flasher)
+func GetFlasher(cdi *container.IoC) *Flasher {
+	return cdi.LoadType(FlasherType).(*Flasher)
 }
 
 type flasher Flasher
 
-func (f *flasher) finalize() {
+func (f *flasher) dispose() {
 	if len(f.writeData) > 0 {
 		err := f.store.Save(f.context, f.writeData)
-		assert.NilErr(err)
+		ensure.NilErr(err)
 	}
 }
 
-func (f *flasher) Provide(cdi *scope.Variables) interface{} {
+func (f *flasher) Provide(cdi *container.IoC) interface{} {
 	return (*Flasher)(f)
 }
 
@@ -105,13 +127,13 @@ func (component *Component) Handle(ctx *request.Context) {
 	flasher := &flasher{store: component.Store, context: ctx}
 
 	// maps flasher in the request scope
-	ctx.Variables.MapType(FlasherType, flasher)
+	ctx.IoC.MapProvider(FlasherType, flasher)
 
 	// advance with the request
 	ctx.Advance()
 
 	// finalize the request
-	flasher.finalize()
+	flasher.dispose()
 }
 
 func (component *Component) Bootstrap(a *app.App) {

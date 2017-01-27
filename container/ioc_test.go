@@ -1,4 +1,26 @@
-package scope
+// MIT License
+//
+// Copyright (c) 2017 José Santos <henrique_1609@me.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+package container
 
 import (
 	"testing"
@@ -12,7 +34,7 @@ func TestDiProvideAndInject(t *testing.T) {
 
 	// creates a new DI context
 	var newContext = New()
-	defer newContext.End()
+	defer newContext.Dispose()
 
 	var tt testHolder
 
@@ -26,8 +48,8 @@ func TestDiProvideAndInject(t *testing.T) {
 	}
 
 	// creates a child context
-	newChildContext := newContext.Inherit()
-	defer newChildContext.End()
+	newChildContext := newContext.Fork()
+	defer newChildContext.Dispose()
 
 	// reset tt value
 	tt = testHolder{}
@@ -40,7 +62,7 @@ func TestDiProvideAndInject(t *testing.T) {
 	}
 
 	var empty = New()
-	defer empty.End()
+	defer empty.Dispose()
 	tt = testHolder{}
 	if tt.T != nil {
 		t.Fail()
@@ -52,7 +74,7 @@ func TestDiDone(t *testing.T) {
 	if context.references != 0 {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
-	var childContext = context.Inherit()
+	var childContext = context.Fork()
 	if context.references != 1 {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
@@ -60,7 +82,7 @@ func TestDiDone(t *testing.T) {
 		t.Fatal("Inválid reference counting ", childContext.references)
 	}
 
-	childContext.End()
+	childContext.Dispose()
 	if childContext.parent != nil {
 		t.Fatal("Inválid reference counting ", childContext.references)
 	}
@@ -68,26 +90,11 @@ func TestDiDone(t *testing.T) {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
 
-	context.End()
+	context.Dispose()
 	if context.parent != nil {
 		t.Fatal("Inválid reference counting ", context.references)
 	}
 
-}
-
-func TestGlobal_Checkpoint(t *testing.T) {
-	var context = New()
-	var contextcopy = context
-	(func() {
-		defer Checkpoint(&context)()
-		if context == contextcopy {
-			t.Fail()
-		}
-	})()
-
-	if context != contextcopy {
-		t.Fail()
-	}
 }
 
 var context = New()
@@ -107,9 +114,9 @@ func BenchmarkInjectChild(b *testing.B) {
 		*testing.B
 	}
 	for i := 0; i < b.N; i++ {
-		context := context.Inherit()
+		context := context.Fork()
 		context.Map(b)
 		context.Inject(&tt)
-		context.End()
+		context.Dispose()
 	}
 }

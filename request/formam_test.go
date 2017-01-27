@@ -1,4 +1,4 @@
-package formam
+package request
 
 import (
 	"encoding/hex"

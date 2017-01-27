@@ -1,10 +1,32 @@
+// MIT License
+//
+// Copyright (c) 2017 José Santos <henrique_1609@me.com>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package app
 
 import (
 	"github.com/CloudyKit/framework/common"
+	"github.com/CloudyKit/framework/container"
 	"github.com/CloudyKit/framework/events"
 	"github.com/CloudyKit/framework/request"
-	"github.com/CloudyKit/framework/scope"
 	"reflect"
 	"regexp"
 	"sync"
@@ -19,26 +41,26 @@ type (
 
 		pool   *sync.Pool
 		app    *App
-		Global *scope.Variables
+		Global *container.IoC
 
 		*ctlGen
 		emitter
 		filterHandlers
 	}
 
-	contextHandler struct {
+	controllerHandler struct {
 		pool      *sync.Pool
 		isPtr     bool
 		funcValue reflect.Value
 		zeroValue reflect.Value
 	}
 
-	Context interface {
+	Controller interface {
 		Mx(*Mapper)
 	}
 )
 
-func (app *App) BindContext(contexts ...Context) {
+func (app *App) BindContext(contexts ...Controller) {
 	for i := 0; i < len(contexts); i++ {
 		controller := contexts[i]
 
@@ -55,7 +77,7 @@ func (app *App) BindContext(contexts ...Context) {
 		name := structTyp.String()
 
 		// creates a new di for this controller
-		newDi := app.Variables.Inherit()
+		newDi := app.IoC.Fork()
 
 		// creates a new cascade url generator
 		myGen := new(ctlGen)
@@ -64,10 +86,10 @@ func (app *App) BindContext(contexts ...Context) {
 		myGen.urlGen = app.urlGen
 		myGen.id = name + "."
 
-		newDi.MapType(common.URLGenType, myGen)
+		newDi.MapValue(common.URLGenType, myGen)
 
 		emitter := app.emitter.(*events.Emitter)
-		newDi.MapType(events.EmitterType, func(c *scope.Variables) interface{} {
+		newDi.MapValue(events.EmitterType, func(c *container.IoC) interface{} {
 			return emitter.Inherit()
 		})
 
@@ -88,12 +110,12 @@ func (app *App) BindContext(contexts ...Context) {
 	}
 }
 
-func (handler *contextHandler) Handle(c *request.Context) {
+func (handler *controllerHandler) Handle(c *request.Context) {
 	ii := handler.pool.Get()
 
 	// get's or allocates a new context
 	ctx := reflect.ValueOf(ii)
-	c.Variables.InjectInStructValue(ctx.Elem())
+	c.IoC.InjectValue(ctx.Elem())
 
 	var arguments = [1]reflect.Value{ctx}
 	if handler.isPtr == false {
@@ -124,7 +146,7 @@ func (mx *Mapper) BindAction(method, path, action string, filters ...request.Han
 		return "/%v"
 	})
 
-	mx.app.AddHandlerContextName(mx.Global, mx.name, method, mx.Prefix+path, &contextHandler{
+	mx.app.AddHandlerContextName(mx.Global, mx.name, method, mx.Prefix+path, &controllerHandler{
 		pool:      mx.pool,
 		isPtr:     isPtr,
 		zeroValue: mx.zeroValue,
