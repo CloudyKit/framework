@@ -54,7 +54,7 @@ type decoder struct {
 }
 
 // Decode decodes the url.Values into a element that must be a pointer to a type provided by argument
-func Decode(vs url.Values, dst interface{}) error {
+func formamDecoder(vs url.Values, dst interface{}) error {
 	main := reflect.ValueOf(dst)
 	if main.Kind() != reflect.Ptr {
 		return fmt.Errorf("formam: the value passed for decode is not a pointer but a %v", main.Kind())

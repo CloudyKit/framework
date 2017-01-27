@@ -107,7 +107,7 @@ var structValues = url.Values{
 func TestDecodeInStruct(t *testing.T) {
 	var t1 TestStruct
 	t1.InterfaceStruct = &InterfaceStruct{}
-	err := Decode(structValues, &t1)
+	err := formamDecoder(structValues, &t1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -123,7 +123,7 @@ var sliceValues = url.Values{
 
 func TestDecodeInSlice(t *testing.T) {
 	var t2 TestSlice
-	err := Decode(sliceValues, &t2)
+	err := formamDecoder(sliceValues, &t2)
 	if err != nil {
 		t.Error(err)
 	}

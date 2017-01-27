@@ -24,7 +24,6 @@ package request
 
 import (
 	"encoding/json"
-	"github.com/monoculum/formam"
 )
 
 // BindGetForm decodes the request url values into target
@@ -32,7 +31,7 @@ func (ctx *Context) BindGetForm(target interface{}) error {
 	if ctx.Request.Form == nil {
 		ctx.Request.ParseForm()
 	}
-	return formam.Decode(ctx.Request.Form, target)
+	return formamDecoder(ctx.Request.Form, target)
 }
 
 // BindForm decodes request post data into target
@@ -40,7 +39,7 @@ func (ctx *Context) BindForm(target interface{}) error {
 	if ctx.Request.PostForm == nil {
 		ctx.Request.ParseForm()
 	}
-	return formam.Decode(ctx.Request.PostForm, target)
+	return formamDecoder(ctx.Request.PostForm, target)
 }
 
 // BindJSON decodes request body as json into the target
