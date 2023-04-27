@@ -49,7 +49,7 @@ type mJob struct {
 }
 
 type Manager struct {
-	Global     *container.IoC
+	Global     *container.Registry
 	Generator  IdGenerator
 	Store      Store
 	Serializer Serializer
@@ -64,8 +64,8 @@ func (manager *Manager) gcgoroutine() {
 	}
 }
 
-//Open load stored session and un serialize the stored data into dst
-func (manager *Manager) Open(ctx *container.IoC, sessionName string, dst interface{}) error {
+// Open load stored session and un serialize the stored data into dst
+func (manager *Manager) Open(ctx *container.Registry, sessionName string, dst interface{}) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	reader, err := manager.Store.Reader(ctx, sessionName, time.Now().Add(-manager.Duration))
 	if err == nil && reader != nil {
@@ -77,8 +77,8 @@ func (manager *Manager) Open(ctx *container.IoC, sessionName string, dst interfa
 	return err
 }
 
-//Save save the session
-func (manager *Manager) Save(ctx *container.IoC, sessionName string, session interface{}) error {
+// Save save the session
+func (manager *Manager) Save(ctx *container.Registry, sessionName string, session interface{}) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	writer, err := manager.Store.Writer(ctx, sessionName)
 	if err == nil && writer != nil {
@@ -90,8 +90,8 @@ func (manager *Manager) Save(ctx *container.IoC, sessionName string, session int
 	return err
 }
 
-//Remove remove the session
-func (manager *Manager) Remove(ctx *container.IoC, sessionName string) error {
+// Remove remove the session
+func (manager *Manager) Remove(ctx *container.Registry, sessionName string) error {
 	defer manager.kMX.Lock(sessionName).Unlock()
 	return manager.Store.Remove(ctx, sessionName)
 }

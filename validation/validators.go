@@ -30,8 +30,8 @@ import (
 	"time"
 )
 
-func Sub(runner func(At)) Tester {
-	return func(c *Validator) {
+func Sub(runner func(At)) Validator {
+	return func(c *Context) {
 		cc := *c
 		value := c.Value
 		prefix := c.prefix + c.Name
@@ -94,8 +94,8 @@ func IsZero(v reflect.Value) bool {
 	return v.IsNil()
 }
 
-func BeforeNow(msg string) Tester {
-	return func(c *Validator) {
+func BeforeNow(msg string) Validator {
+	return func(c *Context) {
 		timeNow := time.Now()
 		if c.Value.Interface().(time.Time).After(timeNow) {
 			c.Err(msg)
@@ -103,8 +103,8 @@ func BeforeNow(msg string) Tester {
 	}
 }
 
-func AfterNow(msg string) Tester {
-	return func(c *Validator) {
+func AfterNow(msg string) Validator {
+	return func(c *Context) {
 		timeNow := time.Now()
 		if c.Value.Interface().(time.Time).Before(timeNow) {
 			c.Err(msg)
@@ -112,24 +112,24 @@ func AfterNow(msg string) Tester {
 	}
 }
 
-func NoEmpty(msg string) Tester {
-	return func(c *Validator) {
+func NoEmpty(msg string) Validator {
+	return func(c *Context) {
 		if IsZero(c.Value) {
 			c.Err(msg)
 		}
 	}
 }
 
-func Empty(msg string) Tester {
-	return func(c *Validator) {
+func Empty(msg string) Validator {
+	return func(c *Context) {
 		if IsZero(c.Value) == false {
 			c.Err(msg)
 		}
 	}
 }
 
-func OneOf(msg string, list ...interface{}) Tester {
-	return func(c *Validator) {
+func OneOf(msg string, list ...interface{}) Validator {
+	return func(c *Context) {
 		for i := 0; i < len(list); i++ {
 			if reflect.DeepEqual(list[i], c.Value.Interface()) {
 				return
@@ -140,16 +140,16 @@ func OneOf(msg string, list ...interface{}) Tester {
 	}
 }
 
-func StringContains(msg string, item string) Tester {
-	return func(c *Validator) {
+func StringContains(msg string, item string) Validator {
+	return func(c *Context) {
 		if strings.Contains(c.Value.String(), item) == false {
 			c.Err(msg)
 		}
 	}
 }
 
-func SliceContains(msg string, item interface{}) Tester {
-	return func(c *Validator) {
+func SliceContains(msg string, item interface{}) Validator {
+	return func(c *Context) {
 		size := c.Value.Len()
 		for i := 0; i < size; i++ {
 			if reflect.DeepEqual(c.Value.Index(i).Interface(), item) {
@@ -161,72 +161,72 @@ func SliceContains(msg string, item interface{}) Tester {
 	}
 }
 
-func SameAs(msg string, FieldName string) Tester {
-	return func(c *Validator) {
+func SameAs(msg string, FieldName string) Validator {
+	return func(c *Context) {
 		if reflect.DeepEqual(c.Field(FieldName).Interface(), c.Value.Interface()) == false {
 			c.Err(msg)
 		}
 	}
 }
 
-func MinLength(msg string, length int) Tester {
-	return func(c *Validator) {
+func MinLength(msg string, length int) Validator {
+	return func(c *Context) {
 		if c.Value.Len() < length {
 			c.Err(msg)
 		}
 	}
 }
 
-func MaxLength(msg string, length int) Tester {
-	return func(c *Validator) {
+func MaxLength(msg string, length int) Validator {
+	return func(c *Context) {
 		if c.Value.Len() > length {
 			c.Err(msg)
 		}
 	}
 }
 
-func MinUint(msg string, i uint64) Tester {
-	return func(c *Validator) {
+func MinUint(msg string, i uint64) Validator {
+	return func(c *Context) {
 		if c.Value.Uint() < i {
 			c.Err(msg)
 		}
 	}
 }
 
-func MaxUint(msg string, i uint64) Tester {
-	return func(c *Validator) {
+func MaxUint(msg string, i uint64) Validator {
+	return func(c *Context) {
 		if c.Value.Uint() > i {
 			c.Err(msg)
 		}
 	}
 }
 
-func MinInt(msg string, i int64) Tester {
-	return func(c *Validator) {
+func MinInt(msg string, i int64) Validator {
+	return func(c *Context) {
 		if c.Value.Int() < i {
 			c.Err(msg)
 		}
 	}
 }
 
-func MaxInt(msg string, i int64) Tester {
-	return func(c *Validator) {
+func MaxInt(msg string, i int64) Validator {
+	return func(c *Context) {
 		if c.Value.Int() > i {
 			c.Err(msg)
 		}
 	}
 }
 
-func MinFloat(msg string, i float64) Tester {
-	return func(c *Validator) {
+func MinFloat(msg string, i float64) Validator {
+	return func(c *Context) {
 		if c.Value.Float() < i {
 			c.Err(msg)
 		}
 	}
 }
 
-func MaxFloat(msg string, i float64) Tester {
-	return func(c *Validator) {
+func MaxFloat(msg string, i float64) Validator {
+	return func(c *Context) {
 		if c.Value.Float() > i {
 			c.Err(msg)
 		}
@@ -235,10 +235,10 @@ func MaxFloat(msg string, i float64) Tester {
 
 var Email = NewRegexValidator("^(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\\])$")
 
-func NewRegexValidator(pattern string) func(msg string) func(*Validator) {
+func NewRegexValidator(pattern string) func(msg string) func(*Context) {
 	regExp := regexp.MustCompile(pattern)
-	return func(msg string) func(*Validator) {
-		return func(c *Validator) {
+	return func(msg string) func(*Context) {
+		return func(c *Context) {
 			str := fmt.Sprint(c.Value.Interface())
 			if !regExp.MatchString(str) {
 				c.Err(msg)

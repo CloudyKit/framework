@@ -36,24 +36,28 @@ func (fn HandlerFunc) Handle(c *Context) {
 }
 
 // Handler is responsible to handle the request or part of the request, ex: a middleware handler would
-// process some data put the data into the scope.Variables and invoke Advance which will invoke the next
+// process some data put the data into the scope.Registry and invoke DispatchNext which will invoke the next
 // handler, the last handler is responsible for the main logic of the request.
-// calling Advance in the last handler will panic.
+// calling DispatchNext in the last handler will panic.
 type Handler interface {
 	Handle(*Context)
 }
 
-// Advance entry point
-func Advance(c *Context, name string, w http.ResponseWriter, r *http.Request, p router.Parameter, v *container.IoC, h []Handler) {
-	c.Name = name
-	c.Response = w
-	c.Request = r
-	c.Parameters = p
-	c.IoC = v
-	c.handlers = h
+// DispatchNext entry point
+func DispatchNext(context *Context, name string, writer http.ResponseWriter, request *http.Request, parameter router.Parameter, registry *container.Registry, handlers []Handler) error {
+	context.Name = name
+	context.Response = writer
+	context.Request = request
+	context.Parameters = parameter
+	context.Registry = registry
+	context.handlers = handlers
+	if context.Request.Body != nil {
+		context.body = context.Request.Body
+		context.Request.Body = context.GetBodyReader()
+	}
 
 	//maps the request context into the scoped variables
-	v.Map(c)
+	registry.WithValues(context)
 
-	c.Advance()
+	return context.Next()
 }

@@ -39,13 +39,13 @@ type URLGen interface {
 }
 
 // Gets an URL generator from the scope
-func GetURLGen(cdi *container.IoC) URLGen {
+func GetURLGen(cdi *container.Registry) URLGen {
 	urlGen, _ := cdi.LoadType(URLGenType).(URLGen)
 	return urlGen
 }
 
 // GenURL generates an URL with the URLGen available in the scope
-func GenURL(cdi *container.IoC, resource string, v ...interface{}) string {
+func GenURL(cdi *container.Registry, resource string, v ...interface{}) string {
 
 	if cdi == nil {
 		if len(v) == 0 {
@@ -98,7 +98,8 @@ func (fn BaseURL) String() string {
 
 // GenQS generates a url + query string
 // ex: GenQS(nil,"http://google.com/")("q","cats") => Generates http://google.com/?q=cats
-//     or use with GenQS("app.ProductController.ActionHandler","urlParam")("page",5)
-func GenQS(global *container.IoC, resource string, parameters ...interface{}) BaseURL {
+//
+//	or use with GenQS("app.ProductController.ActionHandler","urlParam")("page",5)
+func GenQS(global *container.Registry, resource string, parameters ...interface{}) BaseURL {
 	return NewBaseURL(GenURL(global, resource, parameters...))
 }

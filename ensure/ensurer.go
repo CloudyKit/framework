@@ -20,71 +20,68 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package container
+package ensure
 
 import (
-	"io"
-	"sync"
+	"fmt"
+	"path"
+	"runtime"
+	"strings"
 )
 
-var (
-	//pools
-	ioCloserProviderPool = sync.Pool{
-		New: func() interface{} {
-			return new(ioCloserProvider)
-		},
+type Unexpected struct {
+	Msg, PackageName, FileName, FuncName string
+	Line                                 int
+}
+
+func (u *Unexpected) Error() string {
+	return fmt.Sprintf("(%s).%s => %s on file %s line %d", u.PackageName, u.FuncName, u.Msg, u.FileName, u.Line)
+}
+
+func getErr(msg string) *Unexpected {
+	pc, file, line, _ := runtime.Caller(2)
+	_, fileName := path.Split(file)
+	parts := strings.Split(runtime.FuncForPC(pc).Name(), ".")
+	pl := len(parts)
+	packageName := ""
+	funcName := parts[pl-1]
+
+	if parts[pl-2][0] == '(' {
+		funcName = parts[pl-2] + "." + funcName
+		packageName = strings.Join(parts[0:pl-2], ".")
+	} else {
+		packageName = strings.Join(parts[0:pl-1], ".")
 	}
 
-	poolerProviderPool = sync.Pool{
-		New: func() interface{} {
-			return new(poolerProvider)
-		},
+	return &Unexpected{
+		Msg:         msg,
+		PackageName: packageName,
+		FileName:    fileName,
+		FuncName:    funcName,
+		Line:        line,
 	}
-)
-
-func NewIOCloserProvider(v io.Closer) (closer *ioCloserProvider) {
-	closer, _ = ioCloserProviderPool.Get().(*ioCloserProvider)
-	closer.Value = v
-	return
 }
 
-func NewPoolProvider(pool *sync.Pool, v interface{}) (pooler *poolerProvider) {
-	pooler, _ = poolerProviderPool.Get().(*poolerProvider)
-	pooler.Pool = pool
-	pooler.Value = v
-	return
-}
-
-type ioCloserProvider struct {
-	Value io.Closer
-}
-
-type poolerProvider struct {
-	Pool  *sync.Pool
-	Value interface{}
-}
-
-func (pooler *poolerProvider) Provide(c *Registry) interface{} {
-	if pooler.Value != nil {
-		return pooler.Value
+func Condition(cond bool, msg string) {
+	if !cond {
+		panic(getErr(msg))
 	}
-	pooler.Value = pooler.Pool.Get()
-	return pooler.Value
 }
 
-func (pooler *poolerProvider) Dispose() {
-	if pooler.Value != nil {
-		pooler.Pool.Put(pooler.Value)
+func Nil(value interface{}, msg string) {
+	if value != nil {
+		panic(getErr(msg))
 	}
-	poolerProviderPool.Put(pooler)
 }
 
-func (pp *ioCloserProvider) Dispose() {
-	closer := pp.Value
-	ioCloserProviderPool.Put(pp)
-	closer.Close()
+func NotNil(value interface{}, msg string) {
+	if value == nil {
+		panic(getErr(msg))
+	}
 }
 
-func (pp *ioCloserProvider) Provide(_ *Registry) interface{} {
-	return pp.Value
+func NilErr(err error) {
+	if err != nil {
+		panic(getErr(err.Error()))
+	}
 }

@@ -104,7 +104,7 @@ type Component struct {
 
 var FlasherType = reflect.TypeOf((*Flasher)(nil))
 
-func GetFlasher(cdi *container.IoC) *Flasher {
+func GetFlasher(cdi *container.Registry) *Flasher {
 	return cdi.LoadType(FlasherType).(*Flasher)
 }
 
@@ -117,7 +117,7 @@ func (f *flasher) dispose() {
 	}
 }
 
-func (f *flasher) Provide(cdi *container.IoC) interface{} {
+func (f *flasher) Provide(cdi *container.Registry) interface{} {
 	return (*Flasher)(f)
 }
 
@@ -127,15 +127,15 @@ func (component *Component) Handle(ctx *request.Context) {
 	flasher := &flasher{store: component.Store, context: ctx}
 
 	// maps flasher in the request scope
-	ctx.IoC.MapProvider(FlasherType, flasher)
+	ctx.Registry.MapProvider(FlasherType, flasher)
 
 	// advance with the request
-	ctx.Advance()
+	ctx.Next()
 
 	// finalize the request
 	flasher.dispose()
 }
 
-func (component *Component) Bootstrap(a *app.App) {
-	a.Root().AddMiddleHandlers(component)
+func (component *Component) Bootstrap(a *app.Kernel) {
+	a.Root().BindFilterHandlers(component)
 }

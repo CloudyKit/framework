@@ -24,17 +24,17 @@ package app
 
 type ctlBootstrapper []Controller
 
-func (c ctlBootstrapper) Bootstrap(a *App) {
-	a.BindContext(c...)
+func (c ctlBootstrapper) Bootstrap(a *Kernel) {
+	a.AddControllers(c...)
 }
 
 type componentBootstrapper []Component
 
-func (c componentBootstrapper) Bootstrap(a *App) {
+func (c componentBootstrapper) Bootstrap(a *Kernel) {
 	a.Bootstrap(c...)
 }
 
-// NewContextBundle creates a component that will bind the passed context at bootstrap
+// NewCtlComponent creates a component that will bind the passed context at bootstrap
 func NewCtlComponent(controllers ...Controller) Component {
 	return ctlBootstrapper(controllers)
 }

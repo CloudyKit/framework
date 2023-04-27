@@ -28,7 +28,7 @@ import (
 	"github.com/CloudyKit/framework/request"
 	"github.com/CloudyKit/router"
 
-	"github.com/CloudyKit/framework/events"
+	"github.com/CloudyKit/framework/event"
 	"net/http"
 	"os"
 	"reflect"
@@ -36,25 +36,30 @@ import (
 	"sync"
 )
 
-var AppType = reflect.TypeOf((*App)(nil))
+var KernelType = reflect.TypeOf((*Kernel)(nil))
 
-func Get(c *container.IoC) *App {
-	return c.LoadType(AppType).(*App)
+func GetKernel(c *container.Registry) *Kernel {
+	return c.LoadType(KernelType).(*Kernel)
 }
 
 var Default = New()
 
-func New() *App {
-	_app := &App{IoC: container.New(), Router: router.New(), urlGen: make(urlGen), emitter: events.NewEmitter()}
+func New() *Kernel {
+	kernel := &Kernel{Registry: container.New(), Router: router.New(), URLGen: make(MapURLGen), emitter: event.NewDispatcher()}
 
-	// provide application urlGen as URLer
-	_app.IoC.MapValue(common.URLGenType, _app.urlGen)
+	// provide service URLGen as URLer
+	kernel.Registry.WithTypeAndValue(common.URLGenType, kernel.URLGen)
 	// provide the Router
-	_app.IoC.Map(_app.Router)
+	kernel.Registry.WithValues(kernel.Router)
 	// provide the app
-	_app.IoC.MapValue(AppType, _app)
-	_app.IoC.MapValue(events.EmitterType, _app.emitter)
-	return _app
+	kernel.Registry.WithTypeAndValue(KernelType, kernel)
+	kernel.Registry.WithTypeAndValue(event.EmitterType, kernel.emitter)
+
+	return kernel
+}
+
+func (kernel *Kernel) Container() *container.Registry {
+	return kernel.Registry
 }
 
 type filterHandlers struct {
@@ -62,140 +67,140 @@ type filterHandlers struct {
 }
 
 // ResetMiddleHandlers will clear the registered middlewares
-func (f *filterHandlers) ResetMiddleHandlers() {
-	f.filters = nil
+func (filterHandlers *filterHandlers) ResetMiddleHandlers() {
+	filterHandlers.filters = nil
 }
 
-// AddMiddleHandler adds filters to the request chain
-func (f *filterHandlers) AddMiddleHandlers(filters ...request.Handler) {
-	f.filters = append(f.filters, filters...)
+// BindFilterHandlers adds filters to the request chain
+func (filterHandlers *filterHandlers) BindFilterHandlers(filters ...request.Handler) {
+	filterHandlers.filters = append(filterHandlers.filters, filters...)
 }
 
-//func (f *filterHandlers) AddMiddleHandlersFunc(filters ...request.HandlerFunc) {
-//	nlen := len(filters) + len(f.filters)
-//
-//	nfilters := make([]request.Handler, nlen)
-//
-//	copy(nfilters, f.filters)
-//
-//	for i, j := len(f.filters), 0; i < nlen; i, j = i + 1, j + 1 {
-//		nfilters[i] = filters[j]
-//	}
-//
-//	f.filters = nfilters
-//}
+func (filterHandlers *filterHandlers) BindFilterFuncHandlers(filters ...request.HandlerFunc) {
+	newLen := len(filters) + len(filterHandlers.filters)
+	newFilters := make([]request.Handler, newLen)
+	copy(newFilters, filterHandlers.filters)
 
-func (f *filterHandlers) reslice(filters ...request.Handler) []request.Handler {
-	newFilter := make([]request.Handler, 0, len(f.filters)+len(filters))
-	newFilter = append(newFilter, f.filters...)
+	for i, j := len(filterHandlers.filters), 0; i < newLen; i, j = i+1, j+1 {
+		newFilters[i] = filters[j]
+	}
+
+	filterHandlers.filters = newFilters
+}
+
+func (filterHandlers *filterHandlers) reSlice(filters ...request.Handler) []request.Handler {
+	newFilter := make([]request.Handler, 0, len(filterHandlers.filters)+len(filters))
+	newFilter = append(newFilter, filterHandlers.filters...)
 	newFilter = append(newFilter, filters...)
 	return newFilter
 }
 
 type emitter interface {
-	Subscribe(groups string, handler interface{}) *events.Emitter
-	Emit(groupName, key string, context interface{}) (canceled bool, err error)
+	Subscribe(eventName string, handler interface{}) *event.Dispatcher
+	Dispatch(registry *container.Registry, eventName string, event event.Payload) (canceled bool, err error)
 }
 
-// App app holds your top level data for you application
-// Router, Emitter, Scope
-type App struct {
-	emitter
+// Kernel app holds your top level data for you service
+//
+//	Router, Dispatcher, Scope
+type Kernel struct {
+	emitter emitter
 
-	IoC    *container.IoC // App Variables dependency injection context
-	Router *router.Router // Router
-	Prefix string         // Prefix prefix for path added in this app
-	urlGen urlGen
+	Registry *container.Registry // Kernel Registry dependency injection context
+	Router   *router.Router      // Router
+	Prefix   string              // Prefix prefix for path added in this app
+	URLGen   MapURLGen
 	filterHandlers
 }
 
-// Component represents a application component, a component need to implement
-// a bootstrap method which is responsible to setup the component with the app,
+// Component represents a service component, a component need to implement
+// a bootstrap method which is responsible to set up the component with the app,
 // ex: register a type Providers, or add middleware handler
 type Component interface {
-	Bootstrap(app *App)
+	Bootstrap(app *Kernel)
 }
 
 // Root returns the root app
-func (app *App) Root() *App {
-	return Get(app.IoC)
+func (kernel *Kernel) Root() *Kernel {
+	return GetKernel(kernel.Registry)
 }
 
 // Snapshot causes a sub app to be created and inserted in the scope
 // calling app.Root will return the created sub app
-func (app *App) Snapshot() *App {
-	_app := *app
+func (kernel *Kernel) Snapshot() *Kernel {
+	newKernel := *kernel
 
-	_app.IoC = app.IoC.Fork()
-	_app.IoC.MapValue(AppType, _app)
+	newKernel.Registry = kernel.Registry.Fork()
+	newKernel.Registry.WithTypeAndValue(KernelType, newKernel)
 
-	return &_app
+	return &newKernel
 }
 
 // ComponentFunc func implementing Component interface
-type ComponentFunc func(*App)
+type ComponentFunc func(*Kernel)
 
-func (component ComponentFunc) Bootstrap(a *App) {
+func (component ComponentFunc) Bootstrap(a *Kernel) {
 	component(a)
 }
 
-// Bootstrap bootstrap a list of components, a sub scope will be created, and a copy of the
-// original app is used, in such form that modifing the app.Prefix will not reflect outside this
+// Bootstrap bootstraps a list of components, a sub scope will be created, and a copy of the
+// original app is used, in such form that modifying the app.Prefix will not reflect outside this
 // call.
-func (app App) Bootstrap(b ...Component) {
-	c := app.IoC.Fork()
-	defer c.MustDispose() // require 0 references at this point
-
+func (kernel *Kernel) Bootstrap(b ...Component) {
+	newApp := kernel.Fork()
+	prefix := newApp.Prefix
 	for i := 0; i < len(b); i++ {
+
 		bv := reflect.ValueOf(b[i])
 		if bv.Kind() == reflect.Ptr {
 			bv = bv.Elem()
 			if bv.Kind() == reflect.Struct {
-				c.InjectValue(bv)
+				newApp.Registry.InjectValue(bv)
 			}
 		}
-		b[i].Bootstrap(&app)
+
+		b[i].Bootstrap(newApp)
+		newApp.Prefix = prefix
 	}
 }
 
-// End same as app.Variables.End() invoke this func before exiting the app to cleanup
-func (app *App) Dispose() {
-	app.IoC.Dispose()
+// Dispose End same as app.Registry.End() invoke this func before exiting the app to cleanup
+func (kernel *Kernel) Dispose() {
+	kernel.Registry.Dispose()
 }
 
 // AddHandlerFunc register a func handler, see: request.Handler
-func (add *App) AddHandlerFunc(method, path string, fn request.HandlerFunc, filters ...request.Handler) {
-	add.AddHandler(method, path, fn, filters...)
+func (kernel *Kernel) AddHandlerFunc(method, path string, fn request.HandlerFunc, filters ...request.Handler) {
+	kernel.AddHandler(method, path, fn, filters...)
 }
 
-// AddHandlerFunc register a handler, see: request.Handler
-func (app *App) AddHandler(method, path string, handler request.Handler, filters ...request.Handler) {
-	app.AddHandlerName("", method, path, handler, filters...)
+// AddHandler register a handler, see: request.Handler
+func (kernel *Kernel) AddHandler(method, path string, handler request.Handler, filters ...request.Handler) {
+	kernel.AddHandlerName("", method, path, handler, filters...)
 }
 
-// AddHandlerFunc register a named handler, see: request.Handler
-func (app *App) AddHandlerName(name, method, path string, handler request.Handler, filters ...request.Handler) {
-	app.AddHandlerContextName(app.IoC, name, method, path, handler, filters...)
+// AddHandlerName register a named handler, see: request.Handler
+func (kernel *Kernel) AddHandlerName(name, method, path string, handler request.Handler, filters ...request.Handler) {
+	kernel.AddHandlerContextName(kernel.Registry, name, method, path, handler, filters...)
 }
 
-// AddHandlerContextName accepts a context, a name identifier, http method|methods, pattern path, handler and filters
+// AddHandlerContextName accepts a context, a Name identifier, http method|methods, pattern path, handler and filters
 // ex: one handler app.AddHandlerContextName(myContext,"mySectionIdentifier","GET", "/public",fileServer,checkAuth)
-//     multiples handles app.AddHandlerContextName(myContext,"mySectionIdentifier","GET|POST|SEARCH", "/products",productHandler,checkAuth)
-func (app *App) AddHandlerContextName(variables *container.IoC, name, method, path string, handler request.Handler, filters ...request.Handler) {
+//
+//	multiples handles app.AddHandlerContextName(myContext,"mySectionIdentifier","GET|POST|SEARCH", "/products",productHandler,checkAuth)
+func (kernel *Kernel) AddHandlerContextName(registry *container.Registry, name, method, path string, handler request.Handler, filters ...request.Handler) {
 
-	filters = append(app.reslice(filters...), handler)
+	filters = append(kernel.reSlice(filters...), handler)
 
-	if variables == nil {
-		variables = app.IoC
+	if registry == nil {
+		registry = kernel.Registry
 	}
 
 	for _, method := range strings.Split(method, "|") {
-		app.Router.AddRoute(method, app.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
-
+		kernel.Router.AddRoute(method, kernel.Prefix+path, func(rw http.ResponseWriter, r *http.Request, v router.Parameter) {
 			c := newRequestContext()
 			defer requestRecover(c)
-
-			request.Advance(c, name, rw, r, v, variables.Fork(), filters)
+			_ = request.DispatchNext(c, name, rw, r, v, registry.Fork(), filters)
 		})
 	}
 }
@@ -203,15 +208,17 @@ func (app *App) AddHandlerContextName(variables *container.IoC, name, method, pa
 // requestRecover finalizes and cleanup request allocated scope variables
 func requestRecover(c *request.Context) {
 
-	variables := c.IoC
-	__contextpool.Put(c)
+	variables := c.Registry
+	// resets request context
+	*c = request.Context{}
+	contextPool.Put(c)
 
-	// we call scope EndForce, this require that all children scopes Ended in this call if not
+	// we call scope EndForce, this requires that all children scopes Ended in this call if not
 	// panic is raised
 	variables.MustDispose()
 }
 
-func (app *App) host(host string) (servein string) {
+func (kernel *Kernel) host(host string) (servein string) {
 	// if host is empty set host apphost
 	if host == "" {
 		host = "apphost"
@@ -227,24 +234,46 @@ func (app *App) host(host string) (servein string) {
 
 // RunServer runs the server with the specified host
 // Calling this func will emit a "app.run" event in the app
-func (app *App) RunServer(host string) error {
-	app.Emit("app.run", host, app)
-	return http.ListenAndServe(host, app.Router)
+func (kernel *Kernel) RunServer(host string) error {
+	e := &RunServerEvent{Host: host}
+	kernel.Dispatch("hub.run", e)
+	return http.ListenAndServe(host, kernel.Router)
 }
 
 // RunServerTLS runs the server in tls mode
 // Calling this func will emit a "app.run.tls" event in the app
-func (app *App) RunServerTLS(host, certfile, keyfile string) error {
-	app.Emit("app.run.tls", host, app)
-	return http.ListenAndServeTLS(app.host(host), certfile, keyfile, app.Router)
+func (kernel *Kernel) RunServerTLS(host, certfile, keyfile string) error {
+	e := &RunServerEventTLS{Host: host, CertFile: certfile, KeyFile: keyfile}
+	kernel.Dispatch("hub.run.tls", e)
+	return http.ListenAndServeTLS(kernel.host(host), certfile, keyfile, kernel.Router)
 }
 
-var __contextpool = sync.Pool{
+func (kernel *Kernel) Subscribe(eventName string, handler interface{}) {
+	kernel.emitter.Subscribe(eventName, handler)
+}
+
+func (kernel *Kernel) Dispatch(eventName string, payload event.Payload) {
+	_, _ = kernel.emitter.Dispatch(kernel.Registry, eventName, payload)
+}
+
+// Fork create child app
+func (kernel *Kernel) Fork() *Kernel {
+	newApp := *kernel
+	newApp.filters = kernel.reSlice()
+	//newApp.Registry = app.Registry.Fork()
+	return &newApp
+}
+
+func (kernel *Kernel) MustDispose() {
+	kernel.Registry.MustDispose()
+}
+
+var contextPool = sync.Pool{
 	New: func() interface{} {
 		return new(request.Context)
 	},
 }
 
 func newRequestContext() *request.Context {
-	return __contextpool.Get().(*request.Context)
+	return contextPool.Get().(*request.Context)
 }

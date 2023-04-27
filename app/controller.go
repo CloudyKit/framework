@@ -25,7 +25,7 @@ package app
 import (
 	"github.com/CloudyKit/framework/common"
 	"github.com/CloudyKit/framework/container"
-	"github.com/CloudyKit/framework/events"
+	"github.com/CloudyKit/framework/event"
 	"github.com/CloudyKit/framework/request"
 	"reflect"
 	"regexp"
@@ -35,15 +35,15 @@ import (
 type (
 	Mapper struct {
 		Prefix    string
-		name      string
+		Name      string
 		typ       reflect.Type
 		zeroValue reflect.Value
 
-		pool   *sync.Pool
-		app    *App
-		Global *container.IoC
+		pool     *sync.Pool
+		app      *Kernel
+		Registry *container.Registry
 
-		*ctlGen
+		*ControllerURLGen
 		emitter
 		filterHandlers
 	}
@@ -60,7 +60,7 @@ type (
 	}
 )
 
-func (app *App) BindContext(contexts ...Controller) {
+func (kernel *Kernel) AddControllers(contexts ...Controller) {
 	for i := 0; i < len(contexts); i++ {
 		controller := contexts[i]
 
@@ -74,48 +74,48 @@ func (app *App) BindContext(contexts ...Controller) {
 			ptrTyp = reflect.PtrTo(ptrTyp)
 		}
 
-		name := structTyp.String()
-
 		// creates a new di for this controller
-		newDi := app.IoC.Fork()
+		registry := kernel.Registry.Fork()
 
 		// creates a new cascade url generator
-		myGen := new(ctlGen)
+		myURLGen := new(ControllerURLGen)
 		// injects parent url generator
-		newDi.Inject(myGen)
-		myGen.urlGen = app.urlGen
-		myGen.id = name + "."
+		registry.Inject(myURLGen)
+		myURLGen.urlGen = kernel.URLGen
 
-		newDi.MapValue(common.URLGenType, myGen)
+		registry.WithTypeAndValue(common.URLGenType, myURLGen)
 
-		emitter := app.emitter.(*events.Emitter)
-		newDi.MapValue(events.EmitterType, func(c *container.IoC) interface{} {
+		emitter := kernel.emitter.(*event.Dispatcher)
+		registry.WithTypeAndProviderFunc(event.EmitterType, func(c *container.Registry) interface{} {
 			return emitter.Inherit()
 		})
 
-		controller.Mx(&Mapper{
-			name:      name,
-			app:       app,
-			typ:       ptrTyp,
-			ctlGen:    myGen,
-			emitter:   app.emitter,
-			Global:    newDi,
-			zeroValue: zero,
+		mapper := &Mapper{
+			Name:             structTyp.String(),
+			app:              kernel,
+			typ:              ptrTyp,
+			ControllerURLGen: myURLGen,
+			emitter:          kernel.emitter,
+			Registry:         registry,
+			zeroValue:        zero,
 			pool: &sync.Pool{
 				New: func() interface{} {
 					return reflect.New(structTyp).Interface()
 				},
 			},
-		})
+		}
+
+		controller.Mx(mapper)
+		myURLGen.id = mapper.Name + "."
 	}
 }
 
 func (handler *controllerHandler) Handle(c *request.Context) {
 	ii := handler.pool.Get()
 
-	// get's or allocates a new context
+	// gets or allocates a new context
 	ctx := reflect.ValueOf(ii)
-	c.IoC.InjectValue(ctx.Elem())
+	c.Registry.InjectValue(ctx.Elem())
 
 	var arguments = [1]reflect.Value{ctx}
 	if handler.isPtr == false {
@@ -139,17 +139,17 @@ func (mx *Mapper) BindAction(method, path, action string, filters ...request.Han
 		}
 	}
 
-	mx.app.urlGen[mx.typ.Elem().String()+"."+action] = acRegex.ReplaceAllStringFunc(mx.app.Prefix+mx.Prefix+path, func(st string) string {
+	mx.app.URLGen[mx.Name+"."+action] = acRegex.ReplaceAllStringFunc(mx.app.Prefix+mx.Prefix+path, func(st string) string {
 		if st[1] == '*' {
 			return "%v"
 		}
 		return "/%v"
 	})
 
-	mx.app.AddHandlerContextName(mx.Global, mx.name, method, mx.Prefix+path, &controllerHandler{
+	mx.app.AddHandlerContextName(mx.Registry, mx.Name, method, mx.Prefix+path, &controllerHandler{
 		pool:      mx.pool,
 		isPtr:     isPtr,
 		zeroValue: mx.zeroValue,
 		funcValue: methodByName.Func,
-	}, mx.reslice(filters...)...)
+	}, mx.reSlice(filters...)...)
 }

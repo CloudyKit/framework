@@ -20,12 +20,44 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package events
+package event
 
 import "github.com/CloudyKit/framework/container"
 
-var EmitterType = container.TypeOf((*Emitter)(nil))
+var sub = &Dispatcher{}
 
-func GetEmitter(c *container.IoC) *Emitter {
-	return c.LoadType(EmitterType).(*Emitter)
+type ValueEvent struct {
+	*Event
+	Value interface{}
+}
+
+func Subscribe(global *container.Registry, groupName string, handler interface{}) *Dispatcher {
+	if global != nil {
+		if sub := GetDispatcher(global); sub != nil {
+			return sub.Subscribe(groupName, handler)
+		}
+	}
+	return sub.Subscribe(groupName, handler)
+}
+
+func NewDispatcher() *Dispatcher {
+	return sub.Inherit()
+}
+
+func Dispatch(registry *container.Registry, eventName string, event Payload) (bool, error) {
+	if registry != nil {
+		if sub := GetDispatcher(registry); sub != nil {
+			return sub.Dispatch(registry, eventName, event)
+		}
+	}
+	return sub.Dispatch(registry, eventName, event)
+}
+
+func Reset(global *container.Registry, groupName string) bool {
+	if global != nil {
+		if sub := GetDispatcher(global); sub != nil {
+			return sub.Reset(groupName)
+		}
+	}
+	return sub.Reset(groupName)
 }

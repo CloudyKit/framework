@@ -26,11 +26,11 @@ import (
 	"github.com/CloudyKit/framework/app"
 	"github.com/CloudyKit/framework/container"
 	"github.com/CloudyKit/framework/request"
-	"github.com/CloudyKit/jet"
+	"github.com/CloudyKit/jet/v6"
 	"reflect"
 )
 
-var DefaultSet = jet.NewHTMLSet("./resources/views")
+var DefaultSet = jet.NewSet(jet.NewOSFileSystemLoader("./resources/views"))
 
 func init() {
 	app.Default.Bootstrap(Component{DefaultSet})
@@ -42,36 +42,36 @@ type Component struct {
 
 var RendererType = reflect.TypeOf((*Renderer)(nil))
 
-func GetRenderer(cdi *container.IoC) *Renderer {
+func GetRenderer(cdi *container.Registry) *Renderer {
 	c, _ := cdi.LoadType(RendererType).(*Renderer)
 	return c
 }
 
-func Render(global *container.IoC, viewName string, c interface{}) {
+func Render(global *container.Registry, viewName string, c interface{}) {
 	GetRenderer(global).Render(viewName, c)
 }
 
 var JetSetType = reflect.TypeOf((*jet.Set)(nil))
 var globalType = reflect.TypeOf(Globals(nil))
 
-func GetJetSet(cdi *container.IoC) *jet.Set {
+func GetJetSet(cdi *container.Registry) *jet.Set {
 	c, _ := cdi.LoadType(JetSetType).(*jet.Set)
 	return c
 }
 
-func (p Component) Bootstrap(a *app.App) {
+func (component Component) Bootstrap(a *app.Kernel) {
 
-	a.IoC.MapValue(JetSetType, p.Set)
+	a.Registry.WithTypeAndValue(JetSetType, component.Set)
 
-	a.IoC.MapProviderFunc(RendererType, func(cdi *container.IoC) interface{} {
+	a.Registry.WithTypeAndProviderFunc(RendererType, func(cdi *container.Registry) interface{} {
 		cc := &Renderer{
-			set:      p.Set,
+			set:      component.Set,
 			rcontext: request.GetContext(cdi),
 		}
 		for key, value := range cdi.LoadType(globalType).(Globals) {
 			cc.With(key, value.Provide(cdi))
 		}
-		cdi.MapValue(RendererType, cc)
+		cdi.WithTypeAndValue(RendererType, cc)
 		return cc
 	})
 }
@@ -83,40 +83,40 @@ type Renderer struct {
 	global   Globals
 }
 
-func (s *Renderer) JetSet() *jet.Set {
-	return s.set
+func (renderer *Renderer) JetSet() *jet.Set {
+	return renderer.set
 }
 
-func (c *Renderer) render(templateName string, context interface{}) error {
-	t, err := c.set.GetTemplate(templateName)
+func (renderer *Renderer) render(templateName string, context interface{}) error {
+	t, err := renderer.set.GetTemplate(templateName)
 	if err != nil {
 		return err
 	}
-	return t.Execute(c.rcontext.Response, c.scope, context)
+	return t.Execute(renderer.rcontext.Response, renderer.scope, context)
 }
 
-func (c *Renderer) Render(templateName string, context interface{}) {
-	if err := c.render(templateName, context); err != nil {
+func (renderer *Renderer) Render(templateName string, context interface{}) {
+	if err := renderer.render(templateName, context); err != nil {
 		panic(err)
 	}
 }
 
-func (c *Renderer) Execute(t *jet.Template, context interface{}) error {
-	return t.Execute(c.rcontext.Response, c.scope, context)
+func (renderer *Renderer) Execute(t *jet.Template, context interface{}) error {
+	return t.Execute(renderer.rcontext.Response, renderer.scope, context)
 }
 
-func (c *Renderer) WithValue(name string, v reflect.Value) *Renderer {
-	if c.scope == nil {
-		c.scope = make(jet.VarMap)
+func (renderer *Renderer) WithValue(name string, v reflect.Value) *Renderer {
+	if renderer.scope == nil {
+		renderer.scope = make(jet.VarMap)
 	}
-	c.scope[name] = v
-	return c
+	renderer.scope[name] = v
+	return renderer
 }
 
-func (c *Renderer) With(name string, v interface{}) *Renderer {
-	if c.scope == nil {
-		c.scope = make(jet.VarMap)
+func (renderer *Renderer) With(name string, v interface{}) *Renderer {
+	if renderer.scope == nil {
+		renderer.scope = make(jet.VarMap)
 	}
-	c.scope.Set(name, v)
-	return c
+	renderer.scope.Set(name, v)
+	return renderer
 }

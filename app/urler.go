@@ -27,32 +27,32 @@ import (
 	"github.com/CloudyKit/framework/common"
 )
 
-type urlGen map[string]string
-type ctlGen struct {
-	urlGen urlGen
+type MapURLGen map[string]string
+type ControllerURLGen struct {
+	urlGen MapURLGen
 	id     string
 	Parent common.URLGen
 }
 
-func (urler *ctlGen) URL(dst string, v ...interface{}) string {
+func (urlGen *ControllerURLGen) URL(dst string, v ...interface{}) string {
 
-	if dst, ok := urler.urlGen[urler.id+dst]; ok {
+	if dst, ok := urlGen.urlGen[urlGen.id+dst]; ok {
 		return fmt.Sprintf(dst, v...)
 	}
 
-	if dst, ok := urler.urlGen[dst]; ok {
+	if dst, ok := urlGen.urlGen[dst]; ok {
 		return fmt.Sprintf(dst, v...)
 	}
 
-	if urler.Parent != nil {
-		return urler.Parent.URL(dst, v...)
+	if urlGen.Parent != nil {
+		return urlGen.Parent.URL(dst, v...)
 	}
 
 	return fmt.Sprintf(dst, v...)
 }
 
-func (urler urlGen) URL(dst string, v ...interface{}) string {
-	if dst, ok := urler[dst]; ok {
+func (urlGen MapURLGen) URL(dst string, v ...interface{}) string {
+	if dst, ok := urlGen[dst]; ok {
 		return fmt.Sprintf(dst, v...)
 	}
 	return fmt.Sprintf(dst, v...)

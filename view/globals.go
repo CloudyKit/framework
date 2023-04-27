@@ -30,20 +30,20 @@ import (
 )
 
 type provider interface {
-	Provide(c *container.IoC) interface{}
+	Provide(c *container.Registry) interface{}
 }
 
 func init() {
 	var defaultGlobal = Globals{}
-	app.Default.IoC.Map(defaultGlobal)
-	GlobalInjectName(app.Default.IoC, "link", common.URLGenType)
+	app.Default.Registry.WithValues(defaultGlobal)
+	GlobalInjectName(app.Default.Registry, "link", common.URLGenType)
 }
 
 type valueProvider struct {
 	v interface{}
 }
 
-func (v valueProvider) Provide(c *container.IoC) interface{} {
+func (v valueProvider) Provide(c *container.Registry) interface{} {
 	return v.v
 }
 
@@ -51,22 +51,22 @@ type contextProvider struct {
 	typeof reflect.Type
 }
 
-func (v contextProvider) Provide(c *container.IoC) interface{} {
+func (v contextProvider) Provide(c *container.Registry) interface{} {
 	return c.LoadType(v.typeof)
 }
 
 type Globals map[string]provider
 
-func GlobalInjectName(ci *container.IoC, name string, typ reflect.Type) error {
+func GlobalInjectName(ci *container.Registry, name string, typ reflect.Type) error {
 	return globalNameProvider(ci, name, contextProvider{typ})
 }
 
-func GlobalName(ci *container.IoC, name string, v interface{}) error {
+func GlobalName(ci *container.Registry, name string, v interface{}) error {
 	return globalNameProvider(ci, name, valueProvider{v})
 }
 
-func globalNameProvider(ci *container.IoC, name string, v provider) error {
-	globals := ci.LoadType(globalType).(Globals)
+func globalNameProvider(registry *container.Registry, name string, v provider) error {
+	globals := registry.LoadType(globalType).(Globals)
 	globals[name] = v
 	return nil
 }

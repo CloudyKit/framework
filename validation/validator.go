@@ -28,7 +28,7 @@ import (
 	"reflect"
 )
 
-type Tester func(c *Validator)
+type Validator func(c *Context)
 type Provider func(i string) reflect.Value
 
 func NewURLValueProvider(vl url.Values) Provider {
@@ -52,11 +52,11 @@ type Error struct {
 
 type Result []Error
 
-func (result Result) Continuable() bool {
+func (result Result) CanContinue() bool {
 	return len(result) == 0
 }
 
-func (result Result) Bad() bool {
+func (result Result) HasErrors() bool {
 	return len(result) > 0
 }
 
@@ -75,7 +75,7 @@ func (result Result) Get(fieldName string) (err *Error) {
 	return
 }
 
-type Validator struct {
+type Context struct {
 	prefix      string
 	Name        string
 	Value       reflect.Value
@@ -87,21 +87,21 @@ type Validator struct {
 	stopped     bool
 }
 
-func (cc *Validator) Field(name string) reflect.Value {
+func (cc *Context) Field(name string) reflect.Value {
 	if cc.provider != nil {
 		return cc.provider(name)
 	}
 	return cc.target.FieldByName(name)
 }
 
-func (cc *Validator) Done() Result {
+func (cc *Context) Done() Result {
 	if cc == nil {
 		return nil
 	}
 	return cc.errors
 }
 
-func (cc *Validator) Err(msg string) {
+func (cc *Context) Err(msg string) {
 
 	if cc.stoponerror {
 		cc.stopped = true
@@ -111,7 +111,7 @@ func (cc *Validator) Err(msg string) {
 	cc.errors = append(cc.errors, Error{Field: cc.prefix + cc.Name, Description: msg})
 }
 
-func (cc *Validator) Test(fieldName string, vs ...Tester) *Validator {
+func (cc *Context) Test(fieldName string, vs ...Validator) *Context {
 	if !cc.stopped {
 		numValidators := len(vs)
 		cc.Value = cc.Field(fieldName)
@@ -127,14 +127,14 @@ func (cc *Validator) Test(fieldName string, vs ...Tester) *Validator {
 	return cc
 }
 
-func New(target interface{}) *Validator {
+func New(target interface{}) *Context {
 	if target, isProvider := target.(Provider); isProvider {
-		return &Validator{provider: target}
+		return &Context{provider: target}
 	}
-	return &Validator{target: reflect.Indirect(reflect.ValueOf(target))}
+	return &Context{target: reflect.Indirect(reflect.ValueOf(target))}
 }
 
-type At func(fieldName string, vs ...Tester) *Validator
+type At func(fieldName string, vs ...Validator) *Context
 
 func Run(target interface{}, aa func(At)) Result {
 	cc := New(target)

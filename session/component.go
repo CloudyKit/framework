@@ -31,7 +31,7 @@ import (
 	"reflect"
 )
 
-type Component struct {
+type Bundle struct {
 	CookieOptions *CookieOptions
 	Manager       *Manager
 }
@@ -40,23 +40,23 @@ var (
 	SessionType = reflect.TypeOf((*Session)(nil))
 )
 
-func LoadSession(cdi *container.IoC) *Session {
+func GetSessionManager(cdi *container.Registry) *Session {
 	return cdi.LoadType(SessionType).(*Session)
 }
 
-func (component *Component) Handle(ctx *request.Context) {
+func (component *Bundle) Handle(ctx *request.Context) {
 	s := _sessionPool.Get().(*Session)
 	s.data = make(sessionData)
-	ctx.IoC.MapValue(SessionType, s)
+	ctx.Registry.WithTypeAndValue(SessionType, s)
 
 	if readedcookie, _ := ctx.Request.Cookie(component.CookieOptions.Name); readedcookie == nil {
 		s._id = component.Manager.Generator.Generate("", component.CookieOptions.Name)
 	} else {
 		s._id = component.Manager.Generator.Generate(readedcookie.Value, component.CookieOptions.Name)
 		if s._id != readedcookie.Value {
-			component.Manager.Remove(ctx.IoC, readedcookie.Value)
+			component.Manager.Remove(ctx.Registry, readedcookie.Value)
 		}
-		err := component.Manager.Open(ctx.IoC, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
+		err := component.Manager.Open(ctx.Registry, readedcookie.Value, &s.data) //todo: use this error message here can be helpful
 		if err != nil {
 			log.Println("Session read err:", err.Error())
 		}
@@ -74,7 +74,7 @@ func (component *Component) Handle(ctx *request.Context) {
 		Expires:  component.CookieOptions.Expires,
 	})
 
-	ctx.Advance()
+	ctx.Next()
 
 	for sesskey, sessvalue := range s.data {
 		of := reflect.ValueOf(sessvalue)
@@ -86,7 +86,7 @@ func (component *Component) Handle(ctx *request.Context) {
 		}
 	}
 
-	err := component.Manager.Save(ctx.IoC, s._id, s.data)
+	err := component.Manager.Save(ctx.Registry, s._id, s.data)
 	_sessionPool.Put(s)
 
 	if err != nil {
@@ -94,7 +94,7 @@ func (component *Component) Handle(ctx *request.Context) {
 	}
 }
 
-func (component *Component) Bootstrap(a *app.App) {
+func (component *Bundle) Bootstrap(a *app.Kernel) {
 
 	if component.CookieOptions == nil {
 		component.CookieOptions = &CookieOptions{
@@ -107,5 +107,5 @@ func (component *Component) Bootstrap(a *app.App) {
 		}
 	}
 
-	app.Get(a.IoC).AddMiddleHandlers(component)
+	app.GetKernel(a.Registry).BindFilterHandlers(component)
 }

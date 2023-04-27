@@ -35,7 +35,7 @@ var (
 	rwMx          = sync.Mutex{}
 )
 
-func persistPtr(typOf reflect.Type, c *container.IoC, mapto string) {
+func persistPtr(typOf reflect.Type, c *container.Registry, mapto string) {
 	structTyp := typOf.Elem()
 
 	if structTyp.Kind() != reflect.Struct {
@@ -43,21 +43,21 @@ func persistPtr(typOf reflect.Type, c *container.IoC, mapto string) {
 	}
 
 	sessionsTypes[typOf] = mapto
-	c.MapValue(typOf, func(c *container.IoC) (ret interface{}) {
-		sess := LoadSession(c)
+	c.WithTypeAndValue(typOf, func(c *container.Registry) (ret interface{}) {
+		sess := GetSessionManager(c)
 		ret = sess.Get(mapto)
 		if ret == nil {
 			ret = reflect.New(structTyp).Interface()
 			sess.Set(mapto, ret)
 		}
-		c.MapValue(typOf, ret)
+		c.WithTypeAndValue(typOf, ret)
 		return
 	})
 }
 
-func persistStruct(typOf reflect.Type, c *container.IoC, mapto string) {
-	c.MapValue(typOf, func(c *container.IoC, t reflect.Value) {
-		sess := LoadSession(c)
+func persistStruct(typOf reflect.Type, c *container.Registry, mapto string) {
+	c.WithTypeAndValue(typOf, func(c *container.Registry, t reflect.Value) {
+		sess := GetSessionManager(c)
 		val := sess.Get(mapto)
 		if val != nil {
 			valueOf := reflect.ValueOf(val)
@@ -70,11 +70,11 @@ func persistStruct(typOf reflect.Type, c *container.IoC, mapto string) {
 	})
 }
 
-func Persist(c *container.IoC, i interface{}) error {
+func Persist(c *container.Registry, i interface{}) error {
 	return PersistKey(c, "", i)
 }
 
-func PersistKey(c *container.IoC, key string, i interface{}) error {
+func PersistKey(c *container.Registry, key string, i interface{}) error {
 	rwMx.Lock()
 	defer rwMx.Unlock()
 	typOf := reflect.TypeOf(i)

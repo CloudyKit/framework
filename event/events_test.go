@@ -20,39 +20,40 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package events
+package event
 
 import "testing"
 
 type TestContext struct {
+	Event
 	Counter int
 }
 
 func TestManager_Emit(t *testing.T) {
 
-	events := NewEmitter()
+	events := NewDispatcher()
 	testcontext := new(TestContext)
 
-	events.Subscribe("testRunning", func(e *Event, tc *TestContext) {
+	events.Subscribe("testRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
-	events.Subscribe("testNotRunning", func(e *Event, tc *TestContext) {
+	events.Subscribe("testNotRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
-	events.Emit("testRunning", "", testcontext)
+	events.Dispatch(nil, "testRunning", testcontext)
 	t.Logf("Counter %d", testcontext.Counter)
 
 	if testcontext.Counter != 1 {
 		t.Fatalf("Subscribe func for testRunning was not called %#v", events)
 	}
 
-	events.Subscribe("testRunning", func(e *Event, tc *TestContext) {
+	events.Subscribe("testRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
-	events.Emit("testRunning", "", testcontext)
+	events.Dispatch(nil, "testRunning", testcontext)
 	t.Logf("Counter %d", testcontext.Counter)
 	if testcontext.Counter != 3 {
 		t.Fatalf("Subscribe func for testRunning was not called %#v", events)
@@ -63,30 +64,30 @@ func TestManager_EmitParent(t *testing.T) {
 
 	testcontext := new(TestContext)
 
-	events := NewEmitter()
-	events.Subscribe("testRunning", func(e *Event, tc *TestContext) {
+	events := NewDispatcher()
+	events.Subscribe("testRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
 	// in
 	events = events.Inherit()
 
-	events.Subscribe("testNotRunning", func(e *Event, tc *TestContext) {
+	events.Subscribe("testNotRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
-	events.Emit("testRunning", "", testcontext)
+	events.Dispatch(nil, "testRunning", testcontext)
 	t.Logf("Counter %d", testcontext.Counter)
 
 	if testcontext.Counter != 1 {
 		t.Fatalf("Subscribe func for testRunning was not called %#v", events)
 	}
 
-	events.Subscribe("testRunning", func(e *Event, tc *TestContext) {
+	events.Subscribe("testRunning", func(tc *TestContext) {
 		tc.Counter++
 	})
 
-	events.Emit("testRunning", "", testcontext)
+	events.Dispatch(nil, "testRunning", testcontext)
 	t.Logf("Counter %d", testcontext.Counter)
 	if testcontext.Counter != 3 {
 		t.Fatalf("Subscribe func for testRunning was not called %#v", events)
@@ -94,30 +95,30 @@ func TestManager_EmitParent(t *testing.T) {
 }
 
 func TestEmitOrderANDCancellation(t *testing.T) {
-	events := NewEmitter()
+	events := NewDispatcher()
 
 	testcontext := new(TestContext)
 
-	events.Subscribe("cancelation", func(v *Event, c *TestContext) {
+	events.Subscribe("cancelation", func(c *TestContext) {
 		c.Counter = 1
 		t.Fail()
 	})
 
-	events.Subscribe("cancelation", func(v *Event, c *TestContext) {
+	events.Subscribe("cancelation", func(c *TestContext) {
 		c.Counter = 2
-		v.Cancel()
+		c.Cancel()
 	})
-	events.Emit("cancelation", "", testcontext)
+	events.Dispatch(nil, "cancelation", testcontext)
 	if testcontext.Counter != 2 {
 		t.Fail()
 	}
 }
 
-var bench_events = NewEmitter()
+var bench_events = NewDispatcher()
 var bench_context = new(TestContext)
 
 //go:noinline
-func bench_EventHandler(v *Event, c *TestContext) {
+func bench_EventHandler(c *TestContext) {
 	if c.Counter == -1 {
 		c.Counter++
 	}
@@ -135,7 +136,7 @@ var (
 func BenchmarkManager_Emit(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			bench_events.Emit("benchmark", "Emit", bench_context)
+			bench_events.Dispatch(nil, "benchmark", bench_context)
 		}
 	})
 }
@@ -153,14 +154,14 @@ func BenchmarkManager_SubscribeEmit(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			bench_events.Reset("benchmark")
-			bench_events.Subscribe("benchmark", func(e *Event, k *TestContext) {
-				e.Cancel()
+			bench_events.Subscribe("benchmark", func(k *TestContext) {
+				k.Cancel()
 			})
 			bench_events.Subscribe("benchmark", bench_EventHandler)
 			bench_events.Subscribe("benchmark", bench_EventHandler)
 			bench_events.Subscribe("benchmark", bench_EventHandler)
-			bench_events.Emit("benchmark", "Emit", bench_context)
+			bench_events.Dispatch(nil, "benchmark", bench_context)
 		}
 	})
-	b.Log("Number of handlers", len(bench_events.subscriptions[0].handlers))
+	b.Log("NumericId of handlers", len(bench_events.subscriptions[0].handlers))
 }

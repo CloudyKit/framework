@@ -42,10 +42,10 @@ type Serializer interface {
 }
 
 type Store interface {
-	Reader(c *container.IoC, name string, after time.Time) (io.ReadCloser, error)
-	Writer(c *container.IoC, name string) (io.WriteCloser, error)
-	Remove(c *container.IoC, name string) error
-	GC(c *container.IoC, before time.Time)
+	Reader(c *container.Registry, name string, after time.Time) (io.ReadCloser, error)
+	Writer(c *container.Registry, name string) (io.WriteCloser, error)
+	Remove(c *container.Registry, name string) error
+	GC(c *container.Registry, before time.Time)
 }
 
 type RandGenerator struct{}
@@ -58,7 +58,7 @@ func (RandGenerator) Generate(id, name string) string {
 		if n != len(b) || err != nil {
 			panic(err)
 		}
-		return base64.URLEncoding.EncodeToString(b)
+		return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(b)
 	}
 	return id
 }

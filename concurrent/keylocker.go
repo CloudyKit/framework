@@ -86,7 +86,7 @@ func (kmutex *KeyLocker) Lock(key string) sync.Locker {
 	}
 	//release the main locker
 	kmutex.locker.Unlock()
-	//lock the the key locker
+	//lock the key locker
 	mutex.locker.Lock()
 	return mutex
 }

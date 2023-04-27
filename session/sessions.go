@@ -47,10 +47,10 @@ var (
 
 func init() {
 	gob.Register(sessionData(nil))
-	app.Default.Bootstrap(&Component{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
+	app.Default.Bootstrap(&Bundle{Manager: DefaultManager, CookieOptions: DefaultCookieOptions})
 }
 
-//New returns a new session
+// New returns a new session
 func New(gcEvery time.Duration, duration time.Duration, store Store, serializer Serializer, generator IdGenerator) *Manager {
 
 	manager := &Manager{

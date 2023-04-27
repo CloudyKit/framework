@@ -34,10 +34,10 @@ func TestContext_Advance(t *testing.T) {
 	counter := 0
 	handler := HandlerFunc(func(c *Context) {
 		counter++
-		c.Advance()
+		c.Next()
 	})
 
-	Advance(c, "TestHandler", nil, nil, router.Parameter{}, container.New(), []Handler{
+	DispatchNext(c, "TestHandler", nil, nil, router.Parameter{}, container.New(), []Handler{
 		handler,
 		handler,
 		handler,

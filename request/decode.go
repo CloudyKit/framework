@@ -20,39 +20,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package events
+package request
 
-import "github.com/CloudyKit/framework/container"
+import (
+	"encoding/json"
+)
 
-var sub = &Emitter{}
-
-func Subscribe(global *container.IoC, groupName string, handler interface{}) *Emitter {
-	if global != nil {
-		if sub := GetEmitter(global); sub != nil {
-			return sub.Subscribe(groupName, handler)
-		}
+// BindGetForm decodes the request url values into target
+func (c *Context) BindGetForm(target interface{}) error {
+	c.Request.Body = c.GetBodyReader()
+	if c.Request.Form == nil {
+		c.Request.ParseForm()
 	}
-	return sub.Subscribe(groupName, handler)
+	return formamDecoder(c.Request.Form, target)
 }
 
-func NewEmitter() *Emitter {
-	return sub.Inherit()
-}
-
-func Emit(global *container.IoC, groupName, key string, c interface{}) (bool, error) {
-	if global != nil {
-		if sub := GetEmitter(global); sub != nil {
-			return sub.Emit(groupName, key, c)
-		}
+// BindForm decodes request post data into target
+func (c *Context) BindForm(target interface{}) error {
+	c.Request.Body = c.GetBodyReader()
+	if c.Request.PostForm == nil {
+		c.Request.ParseForm()
 	}
-	return sub.Emit(groupName, key, c)
+	return formamDecoder(c.Request.PostForm, target)
 }
 
-func Reset(global *container.IoC, groupName string) bool {
-	if global != nil {
-		if sub := GetEmitter(global); sub != nil {
-			return sub.Reset(groupName)
-		}
-	}
-	return sub.Reset(groupName)
+// BindJSON decodes request body as json into the target
+func (c *Context) BindJSON(target interface{}) error {
+	return json.NewDecoder(c.GetBodyReader()).Decode(target)
 }
+
+// todo: add a generic bind func which will decode values conforming with
+// the request content-type or a query string contentType containing the mime type.
+// func (ctx *Context) Bind(target interface{}) error {
+//	return ctx.BindForm(target)
+// }
